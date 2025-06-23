@@ -2,37 +2,23 @@
 
 `clitest.py` is a self-contained, language-agnostic test runner for command-line interface (CLI) tools. It is written in Python 3 and requires no third-party libraries, making it highly portable.
 
-Tests are defined in a simple, expressive XML format, allowing for detailed and well-documented test suites. The tool reports its results using the standard [Test Anything Protocol (TAP)](https://testanything.org/), making it easy to integrate with CI/CD systems like Jenkins, GitLab CI, and GitHub Actions.
+Tests are defined in a simple, expressive XML format allowing for detailed and well-documented test suites. The tool can run multiple test suites and report their results in one of several formats, including JUnit and TAP, making it easy to integrate with CI/CD systems like Jenkins, GitLab CI, and GitHub Actions.
 
 ## Features
 
 * **Dependency-Free:** Runs anywhere with a standard Python 3 installation.
 * **XML-Based Test Suites:** Create clear, commented, and structured test plans.
-* **TAP-Compliant Output:** Integrates seamlessly with a wide range of developer tools.
+* **Multiple Output Formats:** Integrates seamlessly with a wide range of developer tools.
 * **Full Environment Control:** Define environment variables, working directories, and setup/teardown commands to create stable and isolated tests.
 * **Powerful Output Matching:** Go beyond exact string comparison with support for substring matching (`contains`), regular expressions (`regex`), and automatic normalization of whitespace and ANSI color codes.
 * **Secure:** Executes commands directly without invoking a shell, preventing shell injection vulnerabilities.
 
 ## Example
 
-The clitest.py code is tested by its own test specification:
+The `clitest.py` code is itself tested by its own test specification:
 
 ```sh
 $ python3 clitest.py clitest-*-tests.xml
-
-  The official test suite for the clitest.py tool itself, core features only
-    ✓ Should exit 0 and report a pass for a valid, passing suite
-    ✓ Should exit 1 and report a failure for a valid, failing suite
-    ✓ Should correctly process the 'normalize' attribute
-    ✓ Should correctly process the 'match=regex' attribute
-    ✓ Should correctly apply environment variables to subprocesses
-    ✓ Should fail gracefully if the suite file is not found
-    ✓ Should fail gracefully if the suite file is invalid XML
-    ✓ Should show a usage error when no arguments are given
-    ✓ Should produce valid TAP subtest output for multiple suites
-    ✓ Should produce verbose output with --verbose flag
-    ✓ Should show usage error for mutually exclusive flags --verbose and --quiet
-    ✓ Should list tests with --list-tests flag and not run them
 
   Tests for the --reporter junit feature
     ✓ Should produce valid JUnit XML for a passing suite
@@ -46,6 +32,19 @@ $ python3 clitest.py clitest-*-tests.xml
     ✓ Should produce valid spec output for multiple suites
     ✓ Should produce verbose output with spec reporter
 
+  Test the core features of clitest.py
+    ✓ Should exit 0 and report a pass for a valid, passing suite
+    ✓ Should exit 1 and report a failure for a valid, failing suite
+    ✓ Should correctly process the 'normalize' attribute
+    ✓ Should correctly process the 'match=regex' attribute
+    ✓ Should correctly apply environment variables to subprocesses
+    ✓ Should fail gracefully if the suite file is not found
+    ✓ Should fail gracefully if the suite file is invalid XML
+    ✓ Should show a usage error when no arguments are given
+    ✓ Should produce valid TAP subtest output for multiple suites
+    ✓ Should produce verbose output with --verbose flag
+    ✓ Should show usage error for mutually exclusive flags --verbose and --quiet
+    ✓ Should list tests with --list-tests flag and not run them
 
   20 tests run, 20 passing, 0 failing
 ```
@@ -67,35 +66,43 @@ $ python3 clitest.py -h
 
 * `clitest.py` is invoked from the command line, specifying one or more test suite files.
 * By default, `clitest.py` will run the tests given in the test suite files.
-* To list the cases that would be run, and not run them, pass the --list-tests option.
+* To simply list the cases that would be run (rather than run them), pass the * `--list-tests` option.
 * By default, `spec` output is shown. Use the `--reporter` option to choose `tap` or `junit` alternatives.
 
 ```
-usage: clitest.py [-h] [-v | -q | --list-tests] SUITE [SUITE ...]
+usage: clitest.py [-h] [-v | -q | --list-tests] [--reporter {tap,junit,spec}] SUITE [SUITE ...]
 
 A generic, language-agnostic command-line test runner.
 
 positional arguments:
-  SUITE          One or more paths to test suite XML files.
+  SUITE                 One or more paths to test suite XML files.
 
 options:
-  -h, --help     show this help message and exit
-  -v, --verbose  Enable verbose output, printing descriptions and diagnostics.
-  -q, --quiet    Enable quiet output, suppressing diagnostic messages on failure.
-  --list-tests   List all tests that would be run without executing them.
+  -h, --help            show this help message and exit
+  -v, --verbose         Enable verbose output.
+  -q, --quiet           Enable quiet output.
+  --list-tests          List all tests that would be run without executing them.
+  --reporter {tap,junit,spec}
+                        The output format for test results (default: spec).
 ```
 
 ## Test Suite XML Specification
 
-A test suite file is an XML document that defines the tests to be run. Refer to the (clitest-schema.xsd)[./clitest-schema.xsd] file for the formal specification.
+A test suite file is an XML document that defines the tests to be run. Refer to the [clitest-schema.xsd](./clitest-schema.xsd) file for the formal specification.
+
+In short:
+* The clitest XML format is structured around a root `<test-suite>` element, which can contain an optional `<environment>` block for global setup, teardown, and environment variables.
+* Inside the suite, a `<test-cases>` element holds one or more individual `<test-case>` blocks.
+* Each test case defines a `<command>` to be run, its `<args>`, optional `<stdin>`, and a mandatory `<expect>` block that specifies the expected stdout, stderr, and exit code.
+* Both stdout and stderr expectations can be modified with match (exact, contains, regex) and normalize (ansi, whitespace) attributes for flexible and robust comparisons.
 
 ### Verifying a Test Suite
 
 The `xmllint` tool can validate a test suite XML file you create against the clitest test suite XML schema definition, like so:
 
 ```sh
-$ xmllint --noout --schema clitest-schema.xsd clitest-core-tests.xml
-clitest-core-tests.xml validates
+$ xmllint --noout --schema clitest-schema.xsd clitest-tap-tests.xml
+clitest-tap-tests.xml validates
 ```
 
 ### Full Example (`test-suite.xml`)
