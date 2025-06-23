@@ -31,6 +31,17 @@ ok 6 - Should fail gracefully if the suite file is not found
 
 Refer to the [clitest-tests.xml](./clitest-tests.xml) file.
 
+## Installation
+
+The `clitest.py` file is a standalone test runner. No dependencies need to be installed.
+
+Just download the `clitest.py` code from the command line and begin using it right away:
+
+```sh
+$ curl -LJO https://raw.githubusercontent.com/bishopb/clitest/refs/heads/main/clitest.py
+$ python3 clitest.py -h
+```
+
 ## Usage
 
 `clitest.py` is invoked from the command line, specifying one or more test suite files.
