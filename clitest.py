@@ -243,7 +243,7 @@ def run_suite(suite_path, args, is_subtest=False, pre_parsed_tree=None):
         test_num = i + 1
         description = case_el.get("description", "")
         
-        if args.verbose:
+        if args.verbose and not args.quiet:
             prefix = "    " if is_subtest else ""
             print(f"{prefix}# Executing case: {description or 'Unnamed Test Case'}", file=sys.stderr)
 
@@ -255,15 +255,16 @@ def run_suite(suite_path, args, is_subtest=False, pre_parsed_tree=None):
         else:
             suite_passed = False
             print(f"{indent}not ok {test_num} - {description}")
-            print(f"{indent}  ---")
-            print(f"{indent}  message: \"{result.message}\"")
-            print(f"{indent}  severity: fail")
-            if result.diagnostics:
-                print(f"{indent}  data:")
-                for key, value in result.diagnostics.items():
-                    value_str = str(value).replace('\n', '\\n')
-                    print(f"{indent}    {key}: \"{value_str}\"")
-            print(f"{indent}  ...")
+            if not args.quiet:
+                print(f"{indent}  ---")
+                print(f"{indent}  message: \"{result.message}\"")
+                print(f"{indent}  severity: fail")
+                if result.diagnostics:
+                    print(f"{indent}  data:")
+                    for key, value in result.diagnostics.items():
+                        value_str = str(value).replace('\n', '\\n')
+                        print(f"{indent}    {key}: \"{value_str}\"")
+                print(f"{indent}  ...")
 
     if suite_env_el is not None:
         teardown_el = suite_env_el.find("teardown")
@@ -283,11 +284,23 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument('suites', metavar='SUITE', nargs='+', help='One or more paths to test suite XML files.')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output.')
-    parser.add_argument('-q', '--quiet', action='store_true', help='Enable quiet output.')
+    
+    # FIX: Use a mutually exclusive group for verbose and quiet flags.
+    verbosity_group = parser.add_mutually_exclusive_group()
+    verbosity_group.add_argument(
+        '-v', '--verbose', 
+        action='store_true', 
+        help='Enable verbose output, printing descriptions and diagnostics.'
+    )
+    verbosity_group.add_argument(
+        '-q', '--quiet', 
+        action='store_true', 
+        help='Enable quiet output, suppressing diagnostic messages on failure.'
+    )
+    
     args = parser.parse_args()
 
-    # FIX: Pre-flight check for file existence and XML validity before any output.
+    # Pre-flight check for file existence and XML validity before any output.
     parsed_trees = {}
     for suite_path in args.suites:
         if not os.path.exists(suite_path):
@@ -320,9 +333,10 @@ def main():
             if suite_result_code == EXIT_CODE_RUNTIME_ERROR:
                 overall_exit_code = EXIT_CODE_RUNTIME_ERROR
                 print(f"not ok {i+1} - {suite_description}")
-                print(f"  ---")
-                print(f"  message: \"Suite failed to execute due to a runtime or setup error.\"")
-                print(f"  ...")
+                if not args.quiet:
+                    print(f"  ---")
+                    print(f"  message: \"Suite failed to execute due to a runtime or setup error.\"")
+                    print(f"  ...")
                 break
             elif suite_result_code == EXIT_CODE_TESTS_FAILED:
                 if overall_exit_code == EXIT_CODE_SUCCESS:
