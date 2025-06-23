@@ -130,8 +130,9 @@ class JUnitReporter:
                     so_el.text = "\n".join(tc.log)
 
                 if not tc.passed:
-                    failure_attrs = {"message": tc.message, "type": "AssertionError"}
-                    failure_el = ET.SubElement(case_el, "failure", failure_attrs)
+                    tag = "error" if tc.diagnostics.get("error_type") == "TimeoutExpired" else "failure"
+                    failure_attrs = {"message": tc.message, "type": tc.diagnostics.get("error_type", "AssertionError")}
+                    failure_el = ET.SubElement(case_el, tag, failure_attrs)
                     diag_text = "\n".join(f"{key}: {value}" for key, value in tc.diagnostics.items())
                     failure_el.text = diag_text
 
@@ -223,6 +224,13 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
     current_env, working_dir = os.environ.copy(), suite_env.get("working_dir")
     current_env.update(suite_env.get("variables", {}))
     
+    timeout_val = suite_env.get("timeout", None)
+    if (case_timeout_str := case_element.get("timeout")):
+        try:
+            timeout_val = float(case_timeout_str)
+        except (ValueError, TypeError):
+             return fail_early(f"Invalid timeout value on test case: '{case_timeout_str}'")
+
     if (case_env_element := case_element.find("environment")) is not None:
         if (case_work_dir_el := case_env_element.find("working-directory")) is not None and case_work_dir_el.text:
             working_dir = case_work_dir_el.text.strip()
@@ -243,7 +251,10 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
     stdin_data = (stdin_el.text if (stdin_el := case_element.find("stdin")) is not None else None)
 
     try:
-        process = subprocess.run(args, capture_output=True, text=True, input=stdin_data, env=current_env, cwd=working_dir)
+        process = subprocess.run(args, capture_output=True, text=True, input=stdin_data, env=current_env, cwd=working_dir, timeout=timeout_val)
+    except subprocess.TimeoutExpired:
+        diags = {"error_type": "TimeoutExpired", "details": f"Test case exceeded the specified timeout of {timeout_val} seconds."}
+        return fail_early("Test command timed out", diags)
     except FileNotFoundError:
         return fail_early("Command execution failed", {"suggestion": "Ensure <command> has only the executable path."})
     except Exception as e:
@@ -278,7 +289,15 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
     suite_description = root.get("description", suite_path)
     suite_result = SuiteResult(suite_description, suite_path)
 
-    suite_env = {"variables": {}, "working_dir": None, "description": suite_description}
+    suite_env = {"variables": {}, "working_dir": None, "description": suite_description, "timeout": None}
+    
+    if (suite_timeout_str := root.get("timeout")):
+        try:
+            suite_env["timeout"] = float(suite_timeout_str)
+        except (ValueError, TypeError):
+            suite_result.error = f"Invalid suite timeout value: '{suite_timeout_str}'"
+            return suite_result
+
     if (suite_env_el := root.find("environment")) is not None:
         if (work_dir_el := suite_env_el.find("working-directory")) is not None and work_dir_el.text:
             suite_env["working_dir"] = work_dir_el.text.strip()
@@ -310,7 +329,9 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
     suite_result.duration = time.time() - start_time
     return suite_result
 
+# FIX: Restore the list_tests function that was accidentally deleted.
 def list_tests(parsed_trees):
+    """Prints a human-readable list of suites and tests to be run."""
     print("The following tests would be run:")
     for path, tree in parsed_trees.items():
         root = tree.getroot()
@@ -332,12 +353,7 @@ def main():
     mode_group.add_argument('-q', '--quiet', action='store_true', help='Enable quiet output.')
     mode_group.add_argument('--list-tests', action='store_true', help='List all tests that would be run without executing them.')
     
-    parser.add_argument(
-        '--reporter', 
-        choices=['tap', 'junit', 'spec'], 
-        default='spec',  # FIX: Changed default from 'tap' to 'spec'
-        help='The output format for test results (default: %(default)s).'
-    )
+    parser.add_argument('--reporter', choices=['tap', 'junit', 'spec'], default='spec', help='The output format for test results (default: %(default)s).')
     
     args = parser.parse_args()
 

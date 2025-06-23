@@ -105,66 +105,153 @@ $ xmllint --noout --schema clitest-schema.xsd yourapp-feature-tests.xml
 yourapp-feature-tests.xml validates
 ```
 
+### Expectation verification
+
+To create robust and resilient tests, `clitest.py` provides powerful attributes on the `<stdout>` and `<stderr>` tags that allow you to control how the actual output from a command is compared against your expectations.
+
+#### The `match` Attribute
+
+This attribute defines the comparison strategy.
+
+* **`match="exact"` (Default)**
+  This is the default behavior if no `match` attribute is specified. The actual output from the command must be an identical string match to the text inside the `<stdout>` or `<stderr>` tag.
+
+  * **Use when:** You need to test for exact, predictable output, such as a version string or a simple "OK" message.
+  * **Example:**
+    ```xml
+    <stdout match="exact">v1.2.3</stdout>
+    ```
+
+* **`match="contains"`**
+  The test passes if the actual output contains the expected text as a substring.
+
+  * **Use when:** You only care about the presence of a specific keyword or error message within a larger, potentially variable output (like a log file).
+  * **Example:**
+    ```xml
+    <stderr match="contains">ERROR: File not found</stderr>
+    ```
+
+  Recommend to use with the normalize="whitespace" attribute, to eliminate comparison issues related to whitespace
+
+* **`match="regex"`**
+  The test passes if the actual output matches the provided PCRE (Perl Compatible Regular Expressions) pattern. This is the most powerful matching mode.
+
+  * **Use when:** You need to validate structured output that contains variable data like timestamps, process IDs, or file paths. Note that the regex match is unanchored by default; use `^` and `$` for full-line matching.
+  * **Example:**
+    ```xml
+    <!-- This will match "Log file created: app-2024-06-23-143055.log" -->
+    <stdout match="regex"><![CDATA[Log file created: app-\d{4}-\d{2}-\d{2}-\d{6}\.log]]></stdout>
+    ```
+
+  To enforce multi-line matching, begin the regex with `(?s)`.
+
+#### The `normalize` Attribute
+
+This attribute allows you to clean up or "normalize" the actual output *before* the comparison is performed. You can combine normalizers by providing a space-separated list (e.g., `normalize="ansi whitespace"`).
+
+* **`normalize="ansi"`**
+  This strips all ANSI escape codes (used for color, bolding, etc.) from the command's output.
+
+  * **Use when:** You want to test the textual content of a command's output but ignore its styling. This makes tests resilient to changes in color schemes.
+  * **Example:**
+    ```xml
+    <!-- This will successfully match "Error" even if it's colorized in the terminal -->
+    <stderr normalize="ansi" match="contains">Error</stderr>
+    ```
+
+* **`normalize="whitespace"`**
+  This performs a comprehensive cleanup of whitespace. It trims leading/trailing whitespace and collapses all internal newlines, tabs, and consecutive spaces into a single space.
+
+  * **Use when:** You want to test the content of a multi-line output without being sensitive to indentation or exact line breaks.
+  * **Example:**
+    ```xml
+    <!-- If the actual output is a messy, multi-line error message, this will flatten it for easy comparison. -->
+    <stdout normalize="whitespace" match="exact">Error: Operation failed. Please try again.</stdout>
+    ```
+
+By combining these attributes, you can create tests that are both precise in what they validate and resilient to irrelevant changes in formatting or style.
+
+
 ### Example of a Test Suite XML
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 
-  Reference test suite for a hypothetical 'sys-monitor' command-line tool.
+<!--
+  clitest.py: Comprehensive Example Suite
+  This file demonstrates all available features of the XML test format.
 -->
-<test-suite description="Comprehensive tests for the 'sys-monitor' tool">
+<test-suite description="Comprehensive Demo Suite" timeout="60">
 
-  <!-- 
-    A global environment to ensure a clean state for the test run.
-    This creates a directory for logs and removes it upon completion.
-  -->
+  <!-- A global environment for all tests. It creates a temp directory and a variable. -->
   <environment>
-    <working-directory>/tmp/sys-monitor-tests</working-directory>
+    <working-directory>/tmp/clitest-demo</working-directory>
+    <variable name="API_URL">https://api.example.com</variable>
     <setup>
-      <command>mkdir -p /tmp/sys-monitor-tests/logs</command>
+      <command>mkdir -p /tmp/clitest-demo</command>
     </setup>
     <teardown>
-      <command>rm -rf /tmp/sys-monitor-tests</command>
+      <command>rm -rf /tmp/clitest-demo</command>
     </teardown>
   </environment>
 
   <test-cases>
 
-    <!-- Test Case 1: Simple success case with default "exact" matching. -->
-    <test-case description="Should respond to ping">
-      <command>./sys-monitor</command>
-      <args>
-        <arg>--ping</arg>
-      </args>
+    <!--
+      Test Case 1: The Happy Path.
+      This case shows a simple command that passes with an exact stdout match.
+    -->
+    <test-case description="Should output the correct version string">
+      <command>./my-app</command>
+      <args><arg>--version</arg></args>
       <expect>
-        <stdout>pong</stdout>
+        <stdout match="exact">1.2.3</stdout>
         <exit_code>0</exit_code>
       </expect>
     </test-case>
 
-    <!-- Test Case 2: Demonstrates output normalization and substring matching. -->
-    <test-case description="Should report critical failure message, ignoring formatting">
-      <command>./sys-monitor</command>
-      <args>
-        <arg>--check-critical</arg>
-        <arg>service:auth</arg>
-      </args>
+    <!--
+      Test Case 2: Failure, Normalization, and Environment Override.
+      - Expects a non-zero exit code.
+      - Uses `normalize` to ignore color and whitespace in the error message.
+      - Uses `match="contains"` to check for a key phrase.
+      - Defines a case-specific environment variable.
+    -->
+    <test-case description="Should handle errors gracefully">
+      <environment>
+        <variable name="LOG_LEVEL">debug</variable>
+      </environment>
+      <command>./my-app</command>
+      <args><arg>--read</arg><arg>missing.txt</arg></args>
       <expect>
-        <stderr normalize="ansi whitespace" match="contains">CRITICAL: Service 'auth' is non-responsive.</stderr>
-        <exit_code>5</exit_code>
+        <stderr normalize="ansi whitespace" match="contains">ERROR: File not found</stderr>
+        <exit_code>1</exit_code>
       </expect>
     </test-case>
-    
-    <!-- Test Case 3: Demonstrates pattern matching for variable output. -->
-    <test-case description="Should confirm log file creation with correct format">
-      <command>./sys-monitor</command>
-      <args>
-        <arg>--log-event</arg>
-        <arg>"User login"</arg>
-      </args>
+
+    <!--
+      Test Case 3: Stdin and Regex Matching.
+      - Provides input to the command via the <stdin> tag.
+      - Uses `match="regex"` to validate structured output with a variable timestamp.
+    -->
+    <test-case description="Should process stdin and produce structured output">
+      <command>./my-app</command>
+      <args><arg>--process</arg></args>
+      <stdin>data to process</stdin>
       <expect>
-        <stdout match="regex">^Log written to /tmp/sys-monitor-tests/logs/\d{4}-\d{2}-\d{2}-\d{6}\.log$</stdout>
-        <exit_code>0</exit_code>
+        <stdout match="regex"><![CDATA[Processed data successfully at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z]]></stdout>
+      </expect>
+    </test-case>
+
+    <!--
+      Test Case 4: Timeout Override.
+      - Overrides the suite's global timeout of 60 seconds with a much shorter one.
+      - This test will fail if the command takes longer than 5.5 seconds.
+    -->
+    <test-case description="Should complete a long operation within the time limit" timeout="5.5">
+      <command>./my-app</command>
+      <args><arg>--long-operation</arg></args>
+      <expect>
+        <stdout>Operation complete.</stdout>
       </expect>
     </test-case>
 

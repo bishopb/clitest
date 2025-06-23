@@ -179,8 +179,7 @@
           This regex checks for the presence of both suite headers and their test cases.
           The (?s) flag lets '.' match newlines, making the check flexible.
         -->
-        <stdout match="regex">(?s)Suite: suites/suite-pass.xml.*- A basic passing test.*Suite: suites/suite-fail.xml.*- A basic failing test</stdout>
-        <!-- The exit code should be 0 for a successful listing -->
+        <stdout match="regex"><![CDATA[(?s)The following tests would be run:.*Suite: suites/suite-pass.xml.*- A basic passing test.*Suite: suites/suite-fail.xml.*- A basic failing test]]></stdout>
         <exit_code>0</exit_code>
       </expect>
     </test-case>
@@ -199,6 +198,20 @@
       </expect>
     </test-case>
 
+    <test-case description="Should report a timeout failure correctly in TAP format">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>tap</arg>
+        <arg>suites/suite-timeout.xml</arg>
+      </args>
+      <expect>
+        <!-- FIX: Check stdout for the diagnostic message, not stderr, using a more robust regex -->
+        <stdout match="regex"><![CDATA[(?s)not ok 1 - A test that should time out.*?---.*?message: "Test command timed out"]]></stdout>
+        <exit_code>1</exit_code>
+      </expect>
+    </test-case>
 
   </test-cases>
 </test-suite>

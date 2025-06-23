@@ -1,0 +1,8 @@
+<test-suite description="A suite to test timeout functionality">
+  <test-case description="A test that should time out" timeout="1">
+    <command>./helpers/timeout-helper.sh</command>
+    <expect>
+      <exit_code>0</exit_code>
+    </expect>
+  </test-case>
+</test-suite>
