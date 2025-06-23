@@ -185,5 +185,20 @@
       </expect>
     </test-case>
 
+    <test-case description="Should correctly handle the stdin tag">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>tap</arg>
+        <arg>suites/suite-stdin.xml</arg>
+      </args>
+      <expect>
+        <stdout match="contains">ok 1 - Should echo stdin to stdout</stdout>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+
   </test-cases>
 </test-suite>

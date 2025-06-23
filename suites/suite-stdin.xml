@@ -1,0 +1,10 @@
+<test-suite description="A suite to test stdin functionality">
+  <test-case description="Should echo stdin to stdout">
+    <command>./helpers/stdin-helper.sh</command>
+    <stdin>Hello from stdin!</stdin>
+    <expect>
+      <stdout>Hello from stdin!</stdout>
+      <exit_code>0</exit_code>
+    </expect>
+  </test-case>
+</test-suite>
