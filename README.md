@@ -44,21 +44,21 @@ $ python3 clitest.py -h
 
 ## Usage
 
-`clitest.py` is invoked from the command line, specifying one or more test suite files.
+`clitest.py` is invoked from the command line, specifying one or more test suite files. By default, `clitest.py` will run the tests given in the test suite files. To simply list the cases that would be run, pass the --list-tests option.
 
 ```
-usage: clitest.py [-h] [-v | -q] SUITE [SUITE ...]
+usage: clitest.py [-h] [-v | -q | --list-tests] SUITE [SUITE ...]
 
 A generic, language-agnostic command-line test runner.
 
 positional arguments:
-  SUITE                 One or more paths to test suite XML files.
+  SUITE          One or more paths to test suite XML files.
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -v, --verbose         Enable verbose output, printing descriptions from the
-                        test suite as diagnostic comments.
-  -q, --quiet           Enable quiet output.
+options:
+  -h, --help     show this help message and exit
+  -v, --verbose  Enable verbose output, printing descriptions and diagnostics.
+  -q, --quiet    Enable quiet output, suppressing diagnostic messages on failure.
+  --list-tests   List all tests that would be run without executing them.
 ```
 
 ## Test Suite XML Specification

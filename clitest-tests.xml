@@ -149,5 +149,25 @@
       </expect>
     </test-case>
 
+    <test-case description="Should list tests with --list-tests flag and not run them">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--list-tests</arg>
+        <arg>suites/suite-pass.xml</arg>
+        <arg>suites/suite-fail.xml</arg>
+      </args>
+      <expect>
+        <!-- 
+          The output should be a human-readable list, not TAP.
+          This regex checks for the presence of both suite headers and their test cases.
+          The (?s) flag lets '.' match newlines, making the check flexible.
+        -->
+        <stdout match="regex">(?s)Suite: suites/suite-pass.xml.*- A basic passing test.*Suite: suites/suite-fail.xml.*- A basic failing test</stdout>
+        <!-- The exit code should be 0 for a successful listing -->
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
   </test-cases>
 </test-suite>

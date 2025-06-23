@@ -200,7 +200,6 @@ def run_test_case(case_element, suite_env):
 
 def run_suite(suite_path, args, is_subtest=False, pre_parsed_tree=None):
     """Parses and runs a test suite XML file."""
-    # Use the pre-parsed tree if provided, otherwise parse the file.
     root = pre_parsed_tree.getroot() if pre_parsed_tree else ET.parse(suite_path).getroot()
 
     suite_description = root.get("description", suite_path)
@@ -276,6 +275,25 @@ def run_suite(suite_path, args, is_subtest=False, pre_parsed_tree=None):
 
     return (EXIT_CODE_SUCCESS if suite_passed else EXIT_CODE_TESTS_FAILED), total_tests_in_suite
 
+def list_tests(parsed_trees):
+    """Prints a human-readable list of suites and tests to be run."""
+    print("The following tests would be run:")
+    for path, tree in parsed_trees.items():
+        root = tree.getroot()
+        suite_description = root.get("description", path)
+        print(f"\nSuite: {suite_description}")
+        
+        test_cases = root.findall("./test-cases/test-case")
+        if not test_cases:
+            test_cases = root.findall("test-case")
+            
+        if not test_cases:
+            print("  (No test cases found)")
+            continue
+
+        for case_el in test_cases:
+            description = case_el.get("description", "Unnamed Test Case")
+            print(f"  - {description}")
 
 def main():
     """Main entry point for the script."""
@@ -283,19 +301,25 @@ def main():
         description="A generic, language-agnostic command-line test runner.",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    # FIX: Revert SUITE to be a required argument (nargs='+')
     parser.add_argument('suites', metavar='SUITE', nargs='+', help='One or more paths to test suite XML files.')
     
-    # FIX: Use a mutually exclusive group for verbose and quiet flags.
-    verbosity_group = parser.add_mutually_exclusive_group()
-    verbosity_group.add_argument(
+    # Use a mutually exclusive group for different modes of operation.
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
         '-v', '--verbose', 
         action='store_true', 
         help='Enable verbose output, printing descriptions and diagnostics.'
     )
-    verbosity_group.add_argument(
+    mode_group.add_argument(
         '-q', '--quiet', 
         action='store_true', 
         help='Enable quiet output, suppressing diagnostic messages on failure.'
+    )
+    mode_group.add_argument(
+        '--list-tests',
+        action='store_true',
+        help='List all tests that would be run without executing them.'
     )
     
     args = parser.parse_args()
@@ -314,6 +338,11 @@ def main():
             return EXIT_CODE_RUNTIME_ERROR
 
     # --- Main Execution Logic ---
+
+    if args.list_tests:
+        list_tests(parsed_trees)
+        return EXIT_CODE_SUCCESS
+
     print("TAP version 14")
 
     is_multi_suite = len(args.suites) > 1
