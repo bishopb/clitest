@@ -15,6 +15,9 @@ EXIT_CODE_SUCCESS = 0
 EXIT_CODE_TESTS_FAILED = 1
 EXIT_CODE_RUNTIME_ERROR = 2
 
+# --- Constants for Normalization ---
+VALID_NORMALIZERS = {'ansi', 'whitespace'}
+
 # --- ANSI Color Helper ---
 class Ansi:
     """A helper class for adding ANSI color codes to text."""
@@ -130,7 +133,7 @@ class JUnitReporter:
                     so_el.text = "\n".join(tc.log)
 
                 if not tc.passed:
-                    tag = "error" if tc.diagnostics.get("error_type") == "TimeoutExpired" else "failure"
+                    tag = "error" if tc.diagnostics.get("error_type") in ("TimeoutExpired", "ConfigurationError") else "failure"
                     failure_attrs = {"message": tc.message, "type": tc.diagnostics.get("error_type", "AssertionError")}
                     failure_el = ET.SubElement(case_el, tag, failure_attrs)
                     diag_text = "\n".join(f"{key}: {value}" for key, value in tc.diagnostics.items())
@@ -178,21 +181,31 @@ class SpecReporter:
 
 # --- Test Execution Logic (Refactored) ---
 
-def normalize_output(text, normalize_rules):
+def normalize_output(text, normalize_rules_set):
     if not text: return ""
-    rules = normalize_rules.split()
-    if "ansi" in rules: text = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
-    if "whitespace" in rules: text = re.sub(r'\s+', ' ', text).strip()
+    if "ansi" in normalize_rules_set: text = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
+    if "whitespace" in normalize_rules_set: text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 def compare_streams(actual_output, expect_element):
     if expect_element is None:
-        expected_text, match_type, normalize_rules = "", "exact", ""
+        expected_text, match_type, normalize_rules_str = "", "exact", ""
     else:
-        expected_text, match_type, normalize_rules = expect_element.text or "", expect_element.get("match", "exact"), expect_element.get("normalize", "")
+        expected_text, match_type, normalize_rules_str = expect_element.text or "", expect_element.get("match", "exact"), expect_element.get("normalize", "")
     
+    if not normalize_rules_str:
+        normalize_rules = set()
+    else:
+        rules = {rule.strip().lower() for rule in normalize_rules_str.split(',') if rule.strip()}
+        invalid_rules = rules - VALID_NORMALIZERS
+        if invalid_rules:
+            error_msg = f"The normalizer(s) {sorted(list(invalid_rules))} are not valid. Available options are: {sorted(list(VALID_NORMALIZERS))}."
+            diags = {"error_type": "ConfigurationError", "details": error_msg}
+            return False, "Invalid normalizer keyword", "", "", diags
+        normalize_rules = rules
+
     normalized_actual = normalize_output(actual_output, normalize_rules)
-    normalized_expected = normalize_output(expected_text, "whitespace") if "whitespace" in normalize_rules else expected_text
+    normalized_expected = normalize_output(expected_text, normalize_rules) if "whitespace" in normalize_rules else expected_text
 
     passed = False
     if match_type == "exact" and normalized_actual == normalized_expected: passed = True
@@ -200,7 +213,7 @@ def compare_streams(actual_output, expect_element):
     elif match_type == "regex" and re.search(normalized_expected, normalized_actual): passed = True
     
     reason = f"'{match_type}' match failed" if not passed else ""
-    return passed, reason, normalized_actual, normalized_expected
+    return passed, reason, normalized_actual, normalized_expected, {}
 
 def run_command_in_env(command_text, env_vars, working_dir):
     try:
@@ -267,11 +280,18 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
 
     if (expect_el := case_element.find("expect")) is None: return fail_early("Missing <expect> block")
 
-    stdout_passed, stdout_reason, norm_out, norm_exp_out = compare_streams(process.stdout, expect_el.find("stdout"))
-    if not stdout_passed: return fail_early("stdout mismatch", {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out})
+    # FIX: Correctly handle diagnostics reporting for all failure types.
+    stdout_passed, stdout_reason, norm_out, norm_exp_out, config_diags = compare_streams(process.stdout, expect_el.find("stdout"))
+    if not stdout_passed:
+        diags = config_diags if config_diags else {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out}
+        message = "Configuration error" if config_diags else "stdout mismatch"
+        return fail_early(message, diags)
     
-    stderr_passed, stderr_reason, norm_err, norm_exp_err = compare_streams(process.stderr, expect_el.find("stderr"))
-    if not stderr_passed: return fail_early("stderr mismatch", {"reason": stderr_reason, "expected": norm_exp_err, "got": norm_err})
+    stderr_passed, stderr_reason, norm_err, norm_exp_err, config_diags = compare_streams(process.stderr, expect_el.find("stderr"))
+    if not stderr_passed:
+        diags = config_diags if config_diags else {"reason": stderr_reason, "expected": norm_exp_err, "got": norm_err}
+        message = "Configuration error" if config_diags else "stderr mismatch"
+        return fail_early(message, diags)
     
     expected_exit_code = 0
     if (exit_code_el := expect_el.find("exit_code")) is not None and exit_code_el.text:
@@ -329,9 +349,7 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
     suite_result.duration = time.time() - start_time
     return suite_result
 
-# FIX: Restore the list_tests function that was accidentally deleted.
 def list_tests(parsed_trees):
-    """Prints a human-readable list of suites and tests to be run."""
     print("The following tests would be run:")
     for path, tree in parsed_trees.items():
         root = tree.getroot()

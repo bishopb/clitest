@@ -147,7 +147,7 @@ This attribute defines the comparison strategy.
 
 #### The `normalize` Attribute
 
-This attribute allows you to clean up or "normalize" the actual output *before* the comparison is performed. You can combine normalizers by providing a space-separated list (e.g., `normalize="ansi whitespace"`).
+This attribute allows you to clean up or "normalize" the actual output *before* the comparison is performed. You can combine normalizers by providing a comma-separated list (e.g., `normalize="ansi,whitespace"`). Captialization does not matter.
 
 * **`normalize="ansi"`**
   This strips all ANSI escape codes (used for color, bolding, etc.) from the command's output.
@@ -223,7 +223,7 @@ By combining these attributes, you can create tests that are both precise in wha
       <command>./my-app</command>
       <args><arg>--read</arg><arg>missing.txt</arg></args>
       <expect>
-        <stderr normalize="ansi whitespace" match="contains">ERROR: File not found</stderr>
+        <stderr normalize="ansi,whitespace" match="contains">ERROR: File not found</stderr>
         <exit_code>1</exit_code>
       </expect>
     </test-case>
