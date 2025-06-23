@@ -13,6 +13,24 @@ Tests are defined in a simple, expressive XML format, allowing for detailed and 
 * **Powerful Output Matching:** Go beyond exact string comparison with support for substring matching (`contains`), regular expressions (`regex`), and automatic normalization of whitespace and ANSI color codes.
 * **Secure:** Executes commands directly without invoking a shell, preventing shell injection vulnerabilities.
 
+## Example
+
+The clitest.py code is tested by its own test specification:
+
+```sh
+$ python3 clitest.py clitest-tests.xml
+TAP version 14
+ok 1 - Should exit 0 and report a pass for a valid, passing suite
+ok 2 - Should exit 1 and report a failure for a valid, failing suite
+ok 3 - Should correctly process the 'normalize' attribute
+ok 4 - Should correctly process the 'match=regex' attribute
+ok 5 - Should correctly apply environment variables to subprocesses
+ok 6 - Should fail gracefully if the suite file is not found
+1..6
+```
+
+Refer to the [clitest-tests.xml](./clitest-tests.xml) file.
+
 ## Usage
 
 `clitest.py` is invoked from the command line, specifying one or more test suite files.
@@ -34,7 +52,16 @@ optional arguments:
 
 ## Test Suite XML Specification
 
-A test suite file is an XML document that defines the tests to be run.
+A test suite file is an XML document that defines the tests to be run. Refer to the (clitest-schema.xsd)[./clitest-schema.xsd] file for the formal specification.
+
+### Verifying a Test Suite
+
+The `xmllint` tool can validate a test suite XML file you create against the clitest test suite XML schema definition, like so:
+
+```sh
+$ xmllint --noout --schema clitest-schema.xsd clitest-tests.xml
+clitest-tests.xml validates
+```
 
 ### Full Example (`test-suite.xml`)
 

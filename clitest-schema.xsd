@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+    <!-- Simple Type Definitions -->
+
+    <!-- Defines the allowed values for the 'match' attribute -->
+    <xs:simpleType name="matchType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="exact"/>
+            <xs:enumeration value="contains"/>
+            <xs:enumeration value="regex"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Complex Type Definitions -->
+
+    <!-- Defines a reusable type for <stdout> and <stderr> -->
+    <xs:complexType name="streamType">
+        <xs:simpleContent>
+            <xs:extension base="xs:string">
+                <xs:attribute name="match" type="matchType" use="optional" default="exact"/>
+                <xs:attribute name="normalize" type="xs:string" use="optional"/>
+            </xs:extension>
+        </xs:simpleContent>
+    </xs:complexType>
+
+    <!-- Defines a reusable type for the <environment> block -->
+    <xs:complexType name="environmentType">
+        <xs:sequence>
+            <xs:element name="working-directory" type="xs:string" minOccurs="0"/>
+            <xs:element name="variable" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:simpleContent>
+                        <xs:extension base="xs:string">
+                            <xs:attribute name="name" type="xs:string" use="required"/>
+                        </xs:extension>
+                    </xs:simpleContent>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="setup" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="command" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="teardown" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="command" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+    
+    <!-- Defines the structure of a single <test-case> -->
+    <xs:complexType name="testCaseType">
+        <xs:sequence>
+            <xs:element name="environment" type="environmentType" minOccurs="0"/>
+            <xs:element name="command" type="xs:string"/>
+            <xs:element name="args" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="arg" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="stdin" type="xs:string" minOccurs="0"/>
+            <xs:element name="expect">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="stdout" type="streamType" minOccurs="0"/>
+                        <xs:element name="stderr" type="streamType" minOccurs="0"/>
+                        <xs:element name="exit_code" type="xs:integer" minOccurs="0"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+        <xs:attribute name="description" type="xs:string" use="optional"/>
+    </xs:complexType>
+    
+    <!-- Defines the root <test-suite> element -->
+    <xs:complexType name="testSuiteType">
+        <xs:sequence>
+            <xs:element name="environment" type="environmentType" minOccurs="0"/>
+            <xs:element name="test-cases" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="test-case" type="testCaseType" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+        <xs:attribute name="description" type="xs:string" use="optional"/>
+    </xs:complexType>
+    
+    <!-- Root Element Declaration -->
+    <xs:element name="test-suite" type="testSuiteType"/>
+
+</xs:schema>
