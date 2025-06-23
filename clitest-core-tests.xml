@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<test-suite description="The official test suite for the clitest.py tool itself.">
+<test-suite description="The official test suite for the clitest.py tool itself, core features only">
   <test-cases>
 
     <test-case description="Should exit 0 and report a pass for a valid, passing suite">

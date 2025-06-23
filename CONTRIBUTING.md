@@ -20,7 +20,7 @@ If you find a bug, please ensure it hasn't already been reported by searching th
 We urge you to include within your bug report the output of running the clitest.py built-in tests:
 
 ```sh
-$ python3 clitest.py clitest-tests.xml 
+$ python3 clitest.py clitest-*-tests.xml
 TAP version 14
 ok 1 - Should exit 0 and report a pass for a valid, passing suite
 ok 2 - Should exit 1 and report a failure for a valid, failing suite

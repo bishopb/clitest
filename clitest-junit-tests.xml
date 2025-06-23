@@ -1,0 +1,72 @@
+<test-suite description="Tests for the --reporter junit feature">
+  <test-cases>
+
+    <!-- Test Case 1: The Happy Path -->
+    <test-case description="Should produce valid JUnit XML for a passing suite">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>junit</arg>
+        <arg>suites/suite-pass.xml</arg>
+      </args>
+      <expect>
+        <stdout match="regex"><![CDATA[(?s)(<\?xml\s[^>]*\?>\s*)?<testsuites [^>]*tests="1"[^>]*failures="0"[^>]*>.*?<testcase [^>]*>(?!.*?<failure>).*?</testcase>.*?</testsuites>]]></stdout>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+    <!-- Test Case 2: The Failure Path -->
+    <test-case description="Should produce valid JUnit XML for a failing suite">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>junit</arg>
+        <arg>suites/suite-fail.xml</arg>
+      </args>
+      <expect>
+        <stdout match="regex"><![CDATA[(?s)(<\?xml\s[^>]*\?>\s*)?<testsuites [^>]*tests="1"[^>]*failures="1"[^>]*>.*?<testcase [^>]*>.*?<failure [^>]*>.*?</failure>.*?</testcase>.*?</testsuites>]]></stdout>
+        <exit_code>1</exit_code>
+      </expect>
+    </test-case>
+
+    <!-- Test Case 3: The Complex Path (Multiple Suites) -->
+    <test-case description="Should aggregate results correctly in JUnit XML for multiple suites">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>junit</arg>
+        <arg>suites/suite-pass.xml</arg>
+        <arg>suites/suite-fail.xml</arg>
+      </args>
+      <expect>
+        <stdout match="regex"><![CDATA[(?s)(<\?xml\s[^>]*\?>\s*)?<testsuites [^>]*tests="2"[^>]*failures="1"[^>]*>.*?<testsuite [^>]*>.*?</testsuite>.*?<testsuite [^>]*>.*?</testsuite>.*?</testsuites>]]></stdout>
+        <exit_code>1</exit_code>
+      </expect>
+    </test-case>
+
+    <test-case description="Should include verbose output in system-out for JUnit reporter">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--verbose</arg>
+        <arg>--reporter</arg>
+        <arg>junit</arg>
+        <arg>suites/suite-pass.xml</arg>
+      </args>
+      <expect>
+        <!-- 
+          This regex checks that the testcase element contains a system-out tag,
+          and that the system-out tag contains the expected verbose message.
+        -->
+        <stdout match="regex"><![CDATA[(?s)<testcase .*?>.*?<system-out>.*?# Executing case: A basic passing test.*?</system-out>.*?</testcase>]]></stdout>
+        <!-- The stderr stream should be empty as output is captured in the XML -->
+        <stderr></stderr>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+  </test-cases>
+</test-suite>
