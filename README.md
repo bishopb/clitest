@@ -101,8 +101,8 @@ In short:
 The `xmllint` tool can validate a test suite XML file you create against the clitest test suite XML schema definition, like so:
 
 ```sh
-$ xmllint --noout --schema clitest-schema.xsd clitest-tap-tests.xml
-clitest-tap-tests.xml validates
+$ xmllint --noout --schema clitest-schema.xsd yourapp-feature-tests.xml
+yourapp-feature-tests.xml validates
 ```
 
 ### Full Example (`test-suite.xml`)
