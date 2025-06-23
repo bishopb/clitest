@@ -74,5 +74,17 @@
       </expect>
     </test-case>
 
+    <test-case description="Should fail gracefully if the suite file is invalid XML">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>suites/suite-invalid.xml</arg>
+      </args>
+      <expect>
+        <stderr match="contains">Error: Invalid XML in suite file 'suites/suite-invalid.xml'</stderr>
+        <exit_code>2</exit_code>
+      </expect>
+    </test-case>
+
   </test-cases>
 </test-suite>
