@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-suite description="The official test suite for the clitest.py tool itself.">
+  <test-cases>
+
+    <test-case description="Should exit 0 and report a pass for a valid, passing suite">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>suites/suite-pass.xml</arg>
+      </args>
+      <expect>
+        <stdout match="contains">ok 1 - A basic passing test</stdout>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+    <test-case description="Should exit 1 and report a failure for a valid, failing suite">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>suites/suite-fail.xml</arg>
+      </args>
+      <expect>
+        <stdout match="contains">not ok 1 - A basic failing test</stdout>
+        <exit_code>1</exit_code>
+      </expect>
+    </test-case>
+
+    <test-case description="Should correctly process the 'normalize' attribute">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>suites/suite-normalize.xml</arg>
+      </args>
+      <expect>
+        <stdout match="contains">ok 1 - Normalization test</stdout>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+    <test-case description="Should correctly process the 'match=regex' attribute">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>suites/suite-regex.xml</arg>
+      </args>
+      <expect>
+        <stdout match="contains">ok 1 - Regex match test</stdout>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+    <test-case description="Should correctly apply environment variables to subprocesses">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>suites/suite-env-var.xml</arg>
+      </args>
+      <expect>
+        <stdout match="contains">ok 1 - Environment variable test</stdout>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+    
+    <test-case description="Should fail gracefully if the suite file is not found">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>non-existent-suite.xml</arg>
+      </args>
+      <expect>
+        <stderr match="contains">Error: File not found</stderr>
+        <exit_code>2</exit_code>
+      </expect>
+    </test-case>
+
+  </test-cases>
+</test-suite>

@@ -1,0 +1,8 @@
+<test-suite>
+  <test-case description="A basic passing test">
+    <command>./helpers/basic.sh</command>
+    <args><arg>stdout</arg><arg>Hello World</arg></args>
+    <expect><stdout>Hello World
+</stdout><exit_code>0</exit_code></expect>
+  </test-case>
+</test-suite>

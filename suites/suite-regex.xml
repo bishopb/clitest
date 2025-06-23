@@ -1,0 +1,7 @@
+<test-suite>
+  <test-case description="Regex match test">
+    <command>./helpers/basic.sh</command>
+    <args><arg>stdout</arg><arg>User ID: 12345</arg></args>
+    <expect><stdout match="regex">^User ID: \d+$</stdout></expect>
+  </test-case>
+</test-suite>
