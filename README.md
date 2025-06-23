@@ -105,7 +105,7 @@ $ xmllint --noout --schema clitest-schema.xsd yourapp-feature-tests.xml
 yourapp-feature-tests.xml validates
 ```
 
-### Full Example (`test-suite.xml`)
+### Example of a Test Suite XML
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
