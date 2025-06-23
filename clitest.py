@@ -15,6 +15,24 @@ EXIT_CODE_SUCCESS = 0
 EXIT_CODE_TESTS_FAILED = 1
 EXIT_CODE_RUNTIME_ERROR = 2
 
+# --- ANSI Color Helper ---
+class Ansi:
+    """A helper class for adding ANSI color codes to text."""
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    YELLOW = '\033[93m'
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+
+    @staticmethod
+    def green(s): return f"{Ansi.GREEN}{s}{Ansi.RESET}"
+    @staticmethod
+    def red(s): return f"{Ansi.RED}{s}{Ansi.RESET}"
+    @staticmethod
+    def cyan(s): return f"{Ansi.CYAN}{s}{Ansi.RESET}"
+    @staticmethod
+    def yellow(s): return f"{Ansi.YELLOW}{s}{Ansi.RESET}"
+
 # --- Data Classes for Results ---
 
 class TestCaseResult:
@@ -72,11 +90,8 @@ class TapReporter:
 
             for j, tc in enumerate(suite_result.test_cases):
                 test_num = j + 1
-                
-                # Print any captured verbose logs to stderr
                 for log_line in tc.log:
                     print(f"{indent}{log_line}", file=sys.stderr)
-                
                 if tc.passed:
                     print(f"{indent}ok {test_num} - {tc.description}")
                 else:
@@ -99,33 +114,17 @@ class JUnitReporter:
         total_failures = sum(sr.num_failures for sr in suite_results)
         total_duration = sum(sr.duration for sr in suite_results)
 
-        root_attrs = {
-            "tests": str(total_tests),
-            "failures": str(total_failures),
-            "time": f"{total_duration:.3f}",
-            "name": "clitest.py suites"
-        }
+        root_attrs = { "tests": str(total_tests), "failures": str(total_failures), "time": f"{total_duration:.3f}", "name": "clitest.py suites" }
         root = ET.Element("testsuites", root_attrs)
 
         for suite_result in suite_results:
-            suite_attrs = {
-                "name": suite_result.description,
-                "tests": str(suite_result.num_tests),
-                "failures": str(suite_result.num_failures),
-                "time": f"{suite_result.duration:.3f}",
-                "hostname": "localhost"
-            }
+            suite_attrs = { "name": suite_result.description, "tests": str(suite_result.num_tests), "failures": str(suite_result.num_failures), "time": f"{suite_result.duration:.3f}", "hostname": "localhost" }
             suite_el = ET.SubElement(root, "testsuite", suite_attrs)
 
             for tc in suite_result.test_cases:
-                case_attrs = {
-                    "classname": tc.classname,
-                    "name": tc.description,
-                    "time": f"{tc.duration:.3f}"
-                }
+                case_attrs = { "classname": tc.classname, "name": tc.description, "time": f"{tc.duration:.3f}" }
                 case_el = ET.SubElement(suite_el, "testcase", case_attrs)
 
-                # FIX: Add captured verbose log to <system-out>
                 if tc.log:
                     so_el = ET.SubElement(case_el, "system-out")
                     so_el.text = "\n".join(tc.log)
@@ -133,28 +132,56 @@ class JUnitReporter:
                 if not tc.passed:
                     failure_attrs = {"message": tc.message, "type": "AssertionError"}
                     failure_el = ET.SubElement(case_el, "failure", failure_attrs)
-                    
-                    diag_text = ""
-                    if tc.diagnostics:
-                        for key, value in tc.diagnostics.items():
-                            diag_text += f"{key}: {value}\n"
+                    diag_text = "\n".join(f"{key}: {value}" for key, value in tc.diagnostics.items())
                     failure_el.text = diag_text
 
         ET.indent(root)
         xml_string = ET.tostring(root, encoding="unicode", xml_declaration=True, short_empty_elements=False)
         print(xml_string)
 
+class SpecReporter:
+    """Generates a human-readable spec-style report."""
+    def render(self, suite_results, args):
+        failures = []
+        total_tests = 0
+        
+        for suite_result in suite_results:
+            print(f"\n  {Ansi.cyan(suite_result.description)}")
+            if suite_result.error:
+                print(f"    {Ansi.red('ERROR:')} {suite_result.error}")
+                continue
+
+            for tc in suite_result.test_cases:
+                total_tests += 1
+                for log_line in tc.log:
+                    print(f"    {log_line}", file=sys.stderr)
+                
+                if tc.passed:
+                    print(f"    {Ansi.green('✓')} {tc.description}")
+                else:
+                    failures.append(tc)
+                    print(f"    {Ansi.red(f'{len(failures)}) {tc.description}')}")
+
+        print(f"\n\n  {total_tests} tests run, {Ansi.green(f'{total_tests - len(failures)} passing')}, {Ansi.red(f'{len(failures)} failing')}")
+
+        if failures and not args.quiet:
+            print(f"\n  {Ansi.red('Failure Details:')}\n")
+            for i, tc in enumerate(failures):
+                print(f"  {i+1}) {Ansi.red(tc.description)}")
+                print(f"     {Ansi.yellow('Message:')} {tc.message}")
+                if tc.diagnostics:
+                    for key, value in tc.diagnostics.items():
+                        print(f"     {Ansi.yellow(f'{key.capitalize()}:')} {value}")
+                print()
+
 
 # --- Test Execution Logic (Refactored) ---
 
 def normalize_output(text, normalize_rules):
-    if not text:
-        return ""
+    if not text: return ""
     rules = normalize_rules.split()
-    if "ansi" in rules:
-        text = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
-    if "whitespace" in rules:
-        text = re.sub(r'\s+', ' ', text).strip()
+    if "ansi" in rules: text = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
+    if "whitespace" in rules: text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 def compare_streams(actual_output, expect_element):
@@ -167,12 +194,9 @@ def compare_streams(actual_output, expect_element):
     normalized_expected = normalize_output(expected_text, "whitespace") if "whitespace" in normalize_rules else expected_text
 
     passed = False
-    if match_type == "exact" and normalized_actual == normalized_expected:
-        passed = True
-    elif match_type == "contains" and normalized_expected in normalized_actual:
-        passed = True
-    elif match_type == "regex" and re.search(normalized_expected, normalized_actual):
-        passed = True
+    if match_type == "exact" and normalized_actual == normalized_expected: passed = True
+    elif match_type == "contains" and normalized_expected in normalized_actual: passed = True
+    elif match_type == "regex" and re.search(normalized_expected, normalized_actual): passed = True
     
     reason = f"'{match_type}' match failed" if not passed else ""
     return passed, reason, normalized_actual, normalized_expected
@@ -207,8 +231,7 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
         if (setup_el := case_env_element.find("setup")) is not None:
             for cmd_el in setup_el.findall("command"):
                 success, msg = run_command_in_env(cmd_el.text.strip(), current_env, working_dir)
-                if not success:
-                    return fail_early("Test case setup command failed", {"error": msg})
+                if not success: return fail_early("Test case setup command failed", {"error": msg})
     
     if (command_el := case_element.find("command")) is None or not command_el.text:
         return fail_early("Missing or empty <command> tag")
@@ -229,26 +252,20 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
     if (case_env_element := case_element.find("environment")) is not None and (teardown_el := case_env_element.find("teardown")) is not None:
         for cmd_el in teardown_el.findall("command"):
             success, msg = run_command_in_env(cmd_el.text.strip(), current_env, working_dir)
-            if not success:
-                return fail_early("Test case teardown command failed", {"error": msg})
+            if not success: return fail_early("Test case teardown command failed", {"error": msg})
 
-    if (expect_el := case_element.find("expect")) is None:
-        return fail_early("Missing <expect> block")
+    if (expect_el := case_element.find("expect")) is None: return fail_early("Missing <expect> block")
 
     stdout_passed, stdout_reason, norm_out, norm_exp_out = compare_streams(process.stdout, expect_el.find("stdout"))
-    if not stdout_passed:
-        return fail_early("stdout mismatch", {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out})
+    if not stdout_passed: return fail_early("stdout mismatch", {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out})
     
     stderr_passed, stderr_reason, norm_err, norm_exp_err = compare_streams(process.stderr, expect_el.find("stderr"))
-    if not stderr_passed:
-        return fail_early("stderr mismatch", {"reason": stderr_reason, "expected": norm_exp_err, "got": norm_err})
+    if not stderr_passed: return fail_early("stderr mismatch", {"reason": stderr_reason, "expected": norm_exp_err, "got": norm_err})
     
     expected_exit_code = 0
     if (exit_code_el := expect_el.find("exit_code")) is not None and exit_code_el.text:
-        try:
-            expected_exit_code = int(exit_code_el.text.strip())
-        except (ValueError, TypeError):
-            return fail_early(f"Invalid <exit_code> value: '{exit_code_el.text}'")
+        try: expected_exit_code = int(exit_code_el.text.strip())
+        except (ValueError, TypeError): return fail_early(f"Invalid <exit_code> value: '{exit_code_el.text}'")
     
     if process.returncode != expected_exit_code:
         return fail_early("Exit code mismatch", {"expected": str(expected_exit_code), "got": str(process.returncode)})
@@ -277,14 +294,11 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
                     suite_result.duration = time.time() - start_time
                     return suite_result
 
-    test_cases = root.findall("./test-cases/test-case") or root.findall("test-case")
-    
-    for case_el in test_cases:
+    for case_el in (root.findall("./test-cases/test-case") or root.findall("test-case")):
         log_messages = []
         if args.verbose:
             description = case_el.get("description", "Unnamed Test Case")
             log_messages.append(f"# Executing case: {description}")
-        
         suite_result.test_cases.append(run_test_case(case_el, suite_env, log_messages))
 
     if (suite_env_el := root.find("environment")) is not None and (teardown_el := suite_env_el.find("teardown")) is not None:
@@ -295,8 +309,6 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
     
     suite_result.duration = time.time() - start_time
     return suite_result
-
-# --- Main Application Logic ---
 
 def list_tests(parsed_trees):
     print("The following tests would be run:")
@@ -320,7 +332,12 @@ def main():
     mode_group.add_argument('-q', '--quiet', action='store_true', help='Enable quiet output.')
     mode_group.add_argument('--list-tests', action='store_true', help='List all tests that would be run without executing them.')
     
-    parser.add_argument('--reporter', choices=['tap', 'junit'], default='tap', help='The output format for test results (default: %(default)s).')
+    parser.add_argument(
+        '--reporter', 
+        choices=['tap', 'junit', 'spec'], 
+        default='spec',  # FIX: Changed default from 'tap' to 'spec'
+        help='The output format for test results (default: %(default)s).'
+    )
     
     args = parser.parse_args()
 
@@ -342,15 +359,11 @@ def main():
     all_suite_results = [run_suite(path, tree, args) for path, tree in parsed_trees.items()]
 
     overall_exit_code = EXIT_CODE_SUCCESS
-    if any(sr.error for sr in all_suite_results):
-        overall_exit_code = EXIT_CODE_RUNTIME_ERROR
-    elif any(sr.num_failures > 0 for sr in all_suite_results):
-        overall_exit_code = EXIT_CODE_TESTS_FAILED
+    if any(sr.error for sr in all_suite_results): overall_exit_code = EXIT_CODE_RUNTIME_ERROR
+    elif any(sr.num_failures > 0 for sr in all_suite_results): overall_exit_code = EXIT_CODE_TESTS_FAILED
 
-    if args.reporter == 'tap':
-        TapReporter().render(all_suite_results, args)
-    elif args.reporter == 'junit':
-        JUnitReporter().render(all_suite_results, args)
+    reporters = {'tap': TapReporter, 'junit': JUnitReporter, 'spec': SpecReporter}
+    reporters[args.reporter]().render(all_suite_results, args)
 
     return overall_exit_code
 

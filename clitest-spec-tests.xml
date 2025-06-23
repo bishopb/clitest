@@ -1,0 +1,73 @@
+<test-suite description="Tests for the --reporter spec feature">
+  <test-cases>
+
+    <!-- Test Case 1: The Happy Path -->
+    <test-case description="Should produce valid spec output for a passing suite">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>spec</arg>
+        <arg>suites/suite-pass.xml</arg>
+      </args>
+      <expect>
+        <!-- Asserts the output contains the suite description and a passing test with a checkmark -->
+        <stdout match="regex" normalize="ansi"><![CDATA[(?s)suites/suite-pass.xml\n\s+✓ A basic passing test]]></stdout>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+    <!-- Test Case 2: The Failure Path -->
+    <test-case description="Should produce valid spec output for a failing suite">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>spec</arg>
+        <arg>suites/suite-fail.xml</arg>
+      </args>
+      <expect>
+        <!-- Asserts the output contains the failing test number, description, and failure details -->
+        <stdout match="regex" normalize="ansi"><![CDATA[(?s)1\) A basic failing test.*Failure Details:.*stdout mismatch]]></stdout>
+        <exit_code>1</exit_code>
+      </expect>
+    </test-case>
+
+    <!-- Test Case 3: Multiple Suites with Mixed Results -->
+    <test-case description="Should produce valid spec output for multiple suites">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>spec</arg>
+        <arg>suites/suite-pass.xml</arg>
+        <arg>suites/suite-fail.xml</arg>
+      </args>
+      <expect>
+        <!-- Asserts the output contains the first suite passing and the second suite failing -->
+        <stdout match="regex" normalize="ansi"><![CDATA[(?s)suites/suite-pass.xml\n\s+✓ A basic passing test.*suites/suite-fail.xml\n\s+1\) A basic failing test]]></stdout>
+        <exit_code>1</exit_code>
+      </expect>
+    </test-case>
+    
+    <!-- Test Case 4: Verbose Output -->
+    <test-case description="Should produce verbose output with spec reporter">
+      <command>python3</command>
+      <args>
+        <arg>clitest.py</arg>
+        <arg>--reporter</arg>
+        <arg>spec</arg>
+        <arg>--verbose</arg>
+        <arg>suites/suite-pass.xml</arg>
+      </args>
+      <expect>
+        <!-- The main spec output goes to stdout -->
+        <stdout match="regex" normalize="ansi"><![CDATA[✓ A basic passing test]]></stdout>
+        <!-- The verbose diagnostic now correctly goes to stderr -->
+        <stderr match="regex" normalize="ansi"><![CDATA[# Executing case: A basic passing test]]></stderr>
+        <exit_code>0</exit_code>
+      </expect>
+    </test-case>
+
+  </test-cases>
+</test-suite>

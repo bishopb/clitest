@@ -19,17 +19,38 @@ The clitest.py code is tested by its own test specification:
 
 ```sh
 $ python3 clitest.py clitest-*-tests.xml
-TAP version 14
-ok 1 - Should exit 0 and report a pass for a valid, passing suite
-ok 2 - Should exit 1 and report a failure for a valid, failing suite
-ok 3 - Should correctly process the 'normalize' attribute
-ok 4 - Should correctly process the 'match=regex' attribute
-ok 5 - Should correctly apply environment variables to subprocesses
-ok 6 - Should fail gracefully if the suite file is not found
-1..6
+
+  The official test suite for the clitest.py tool itself, core features only
+    ✓ Should exit 0 and report a pass for a valid, passing suite
+    ✓ Should exit 1 and report a failure for a valid, failing suite
+    ✓ Should correctly process the 'normalize' attribute
+    ✓ Should correctly process the 'match=regex' attribute
+    ✓ Should correctly apply environment variables to subprocesses
+    ✓ Should fail gracefully if the suite file is not found
+    ✓ Should fail gracefully if the suite file is invalid XML
+    ✓ Should show a usage error when no arguments are given
+    ✓ Should produce valid TAP subtest output for multiple suites
+    ✓ Should produce verbose output with --verbose flag
+    ✓ Should show usage error for mutually exclusive flags --verbose and --quiet
+    ✓ Should list tests with --list-tests flag and not run them
+
+  Tests for the --reporter junit feature
+    ✓ Should produce valid JUnit XML for a passing suite
+    ✓ Should produce valid JUnit XML for a failing suite
+    ✓ Should aggregate results correctly in JUnit XML for multiple suites
+    ✓ Should include verbose output in system-out for JUnit reporter
+
+  Tests for the --reporter spec feature
+    ✓ Should produce valid spec output for a passing suite
+    ✓ Should produce valid spec output for a failing suite
+    ✓ Should produce valid spec output for multiple suites
+    ✓ Should produce verbose output with spec reporter
+
+
+  20 tests run, 20 passing, 0 failing
 ```
 
-Refer to the [clitest-core-tests.xml](./clitest-core-tests.xml) file for an example.
+Refer to the [clitest-tap-tests.xml](./clitest-tap-tests.xml) file for an example of how to write the test cases for a command line program. Refer to all the `clitest-*-tests.xml` files for an example of how to write different test suites for different features.
 
 ## Installation
 
@@ -44,7 +65,10 @@ $ python3 clitest.py -h
 
 ## Usage
 
-`clitest.py` is invoked from the command line, specifying one or more test suite files. By default, `clitest.py` will run the tests given in the test suite files. To simply list the cases that would be run, pass the --list-tests option.
+* `clitest.py` is invoked from the command line, specifying one or more test suite files.
+* By default, `clitest.py` will run the tests given in the test suite files.
+* To list the cases that would be run, and not run them, pass the --list-tests option.
+* By default, `spec` output is shown. Use the `--reporter` option to choose `tap` or `junit` alternatives.
 
 ```
 usage: clitest.py [-h] [-v | -q | --list-tests] SUITE [SUITE ...]
