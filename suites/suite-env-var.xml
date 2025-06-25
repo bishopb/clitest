@@ -4,8 +4,7 @@
     <test-case description="Environment variable test">
       <command>./helpers/env.sh</command>
       <args><arg>SECRET_MESSAGE</arg></args>
-      <expect><stdout>Hello Env
-  </stdout></expect>
+      <expect><stdout match="regex">^Hello Env$</stdout></expect>
     </test-case>
   </test-cases>
 </test-suite>
