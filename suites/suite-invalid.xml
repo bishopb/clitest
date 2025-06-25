@@ -1,6 +1,8 @@
 <test-suite description="An invalid suite">
+  <test-cases>
     <test-case description="A valid case inside an invalid file">
         <command>echo "This should never run"</command>
     </test-case>
+  </test-cases>
 <!-- This closing tag is deliberately wrong to cause a parse error -->
 </test-suite-invalid>

@@ -1,9 +1,11 @@
 <test-suite>
-  <test-case description="Valid normalization">
-    <command>./helpers/ansi.sh</command>
-    <!--
-    Include spurious whitespace and multiple commas, as well as capitalization, as those should be handled gracefully as well.
-    -->
-    <expect><stdout normalize="ANSI, whitespace">SUCCESS: Operation complete.</stdout></expect>
-  </test-case>
+  <test-cases>
+    <test-case description="Valid normalization">
+      <command>./helpers/ansi.sh</command>
+      <!--
+      Include spurious whitespace and multiple commas, as well as capitalization, as those should be handled gracefully as well.
+      -->
+      <expect><stdout normalize="ANSI, whitespace">SUCCESS: Operation complete.</stdout></expect>
+    </test-case>
+  </test-cases>
 </test-suite>

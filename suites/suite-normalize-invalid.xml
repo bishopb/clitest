@@ -1,9 +1,11 @@
 <test-suite>
-  <test-case description="Invalid normalization">
-    <command>./helpers/basic.sh</command>
-    <args><arg>stdout</arg><arg>hello world</arg></args>
-    <expect>
-      <stdout normalize="foo">hello world</stdout>
-    </expect>
-  </test-case>
+  <test-cases>
+    <test-case description="Invalid normalization">
+      <command>./helpers/basic.sh</command>
+      <args><arg>stdout</arg><arg>hello world</arg></args>
+      <expect>
+        <stdout normalize="foo">hello world</stdout>
+      </expect>
+    </test-case>
+  </test-cases>
 </test-suite>
