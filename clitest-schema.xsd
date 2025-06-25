@@ -10,13 +10,6 @@
         </xs:restriction>
     </xs:simpleType>
 
-    <xs:simpleType name="normalizeType">
-        <xs:restriction base="xs:string">
-            <xs:enumeration value="ansi"/>
-            <xs:enumeration value="whitespace"/>
-        </xs:restriction>
-    </xs:simpleType>
-
     <xs:simpleType name="nonEmptyString">
         <xs:restriction base="xs:string">
             <xs:minLength value="1"/>
@@ -27,15 +20,14 @@
         <xs:simpleContent>
             <xs:extension base="xs:string">
                 <xs:attribute name="match" type="matchType" use="optional" default="exact"/>
-                <xs:attribute name="normalize" type="normalizeType" use="optional"/>
+                <xs:attribute name="normalize" type="nonEmptyString" use="optional"/>
             </xs:extension>
         </xs:simpleContent>
     </xs:complexType>
 
     <xs:complexType name="environmentType">
-        <xs:choice minOccurs="0" maxOccurs="unbounded">
-            <xs:element name="working-directory" type="xs:string" />
-            <xs:element name="variable">
+        <xs:all>
+            <xs:element name="variable" minOccurs="0">
                 <xs:complexType>
                     <xs:simpleContent>
                         <xs:extension base="xs:string">
@@ -44,31 +36,32 @@
                     </xs:simpleContent>
                 </xs:complexType>
             </xs:element>
-            <xs:element name="setup">
+            <xs:element name="working-directory" type="xs:string" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="setup" minOccurs="0" maxOccurs="1">
                 <xs:complexType>
                     <xs:sequence>
                         <xs:element name="command" type="nonEmptyString" minOccurs="0" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
-            <xs:element name="teardown">
+            <xs:element name="teardown" minOccurs="0" maxOccurs="1">
                 <xs:complexType>
                     <xs:sequence>
                         <xs:element name="command" type="nonEmptyString" minOccurs="0" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
-        </xs:choice>
+        </xs:all>
     </xs:complexType>
-    
+
     <xs:complexType name="testCaseType">
-        <xs:sequence>
+        <xs:all>
             <xs:element name="environment" type="environmentType" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="command" type="xs:string"/>
+            <xs:element name="command" type="xs:string" minOccurs="1" maxOccurs="1"/>
             <xs:element name="args" minOccurs="0" maxOccurs="1">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="arg" type="nonEmptyString" minOccurs="0" maxOccurs="unbounded"/>
+                        <xs:element name="arg" type="nonEmptyString" minOccurs="1" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
@@ -82,11 +75,11 @@
                     </xs:choice>
                 </xs:complexType>
             </xs:element>
-        </xs:sequence>
+        </xs:all>
         <xs:attribute name="description" type="xs:string" use="optional"/>
         <xs:attribute name="timeout" type="xs:decimal" use="optional"/>
     </xs:complexType>
-    
+
     <xs:complexType name="testSuiteType">
         <xs:sequence>
             <xs:element name="environment" type="environmentType" minOccurs="0" maxOccurs="1"/>
@@ -101,7 +94,7 @@
         <xs:attribute name="description" type="xs:string" use="optional"/>
         <xs:attribute name="timeout" type="xs:decimal" use="optional"/>
     </xs:complexType>
-    
+
     <xs:element name="test-suite" type="testSuiteType"/>
 
 </xs:schema>
