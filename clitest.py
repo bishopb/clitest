@@ -1,5 +1,13 @@
 # clitest.py - Test any command line program against a test suite you define.
 
+# This program allows you to define a suite of tests in one or more XML "test
+# suite" files, execute them against a command line program under test, and then
+# report the results in various formats.
+#
+# Do not run it with an XML test suite file that you have not fully vetted. It
+# is a powerful tool for a trusted development environment, but it is not
+# hardened against malicious input.
+
 import sys
 import os
 import argparse
