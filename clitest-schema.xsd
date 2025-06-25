@@ -2,7 +2,6 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
 
-    <!-- Simple Type Definitions -->
     <xs:simpleType name="matchType">
         <xs:restriction base="xs:string">
             <xs:enumeration value="exact"/>
@@ -11,20 +10,32 @@
         </xs:restriction>
     </xs:simpleType>
 
-    <!-- Complex Type Definitions -->
+    <xs:simpleType name="normalizeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="ansi"/>
+            <xs:enumeration value="whitespace"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="nonEmptyString">
+        <xs:restriction base="xs:string">
+            <xs:minLength value="1"/>
+        </xs:restriction>
+    </xs:simpleType>
+
     <xs:complexType name="streamType">
         <xs:simpleContent>
             <xs:extension base="xs:string">
                 <xs:attribute name="match" type="matchType" use="optional" default="exact"/>
-                <xs:attribute name="normalize" type="xs:string" use="optional"/>
+                <xs:attribute name="normalize" type="normalizeType" use="optional"/>
             </xs:extension>
         </xs:simpleContent>
     </xs:complexType>
 
     <xs:complexType name="environmentType">
-        <xs:sequence>
-            <xs:element name="working-directory" type="xs:string" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="variable" minOccurs="0" maxOccurs="unbounded">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+            <xs:element name="working-directory" type="xs:string" />
+            <xs:element name="variable">
                 <xs:complexType>
                     <xs:simpleContent>
                         <xs:extension base="xs:string">
@@ -33,21 +44,21 @@
                     </xs:simpleContent>
                 </xs:complexType>
             </xs:element>
-            <xs:element name="setup" minOccurs="0" maxOccurs="1">
+            <xs:element name="setup">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="command" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                        <xs:element name="command" type="nonEmptyString" minOccurs="0" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
-            <xs:element name="teardown" minOccurs="0" maxOccurs="1">
+            <xs:element name="teardown">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="command" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                        <xs:element name="command" type="nonEmptyString" minOccurs="0" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
-        </xs:sequence>
+        </xs:choice>
     </xs:complexType>
     
     <xs:complexType name="testCaseType">
@@ -57,18 +68,18 @@
             <xs:element name="args" minOccurs="0" maxOccurs="1">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="arg" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                        <xs:element name="arg" type="nonEmptyString" minOccurs="0" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
             <xs:element name="stdin" type="xs:string" minOccurs="0" maxOccurs="1"/>
             <xs:element name="expect" minOccurs="1" maxOccurs="1">
                 <xs:complexType>
-                    <xs:sequence>
+                    <xs:choice minOccurs="1" maxOccurs="3">
                         <xs:element name="stdout" type="streamType" minOccurs="0" maxOccurs="1"/>
                         <xs:element name="stderr" type="streamType" minOccurs="0" maxOccurs="1"/>
                         <xs:element name="exit_code" type="xs:integer" minOccurs="0" maxOccurs="1"/>
-                    </xs:sequence>
+                    </xs:choice>
                 </xs:complexType>
             </xs:element>
         </xs:sequence>
@@ -82,7 +93,7 @@
             <xs:element name="test-cases" minOccurs="1" maxOccurs="1">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="test-case" type="testCaseType" minOccurs="1" maxOccurs="unbounded"/>
+                        <xs:element name="test-case" type="testCaseType" minOccurs="0" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>

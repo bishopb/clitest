@@ -279,7 +279,6 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
 
     if (expect_el := case_element.find("expect")) is None: return fail_early("Missing <expect> block")
 
-    # FIX: Correctly handle diagnostics reporting for all failure types.
     stdout_passed, stdout_reason, norm_out, norm_exp_out, config_diags = compare_streams(process.stdout, expect_el.find("stdout"))
     if not stdout_passed:
         diags = config_diags if config_diags else {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out}
@@ -373,7 +372,6 @@ def list_tests(parsed_trees):
         suite_description = root.get("description", path)
         print(f"\nSuite: {suite_description}")
 
-        # FIX #1: Enforce the <test-cases> wrapper element
         test_cases_wrapper = root.find('test-cases')
         if test_cases_wrapper is None:
             print(f"  {Ansi.red('(Structure error: Missing required <test-cases> wrapper element.)')}")
