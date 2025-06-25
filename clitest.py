@@ -187,10 +187,8 @@ def normalize_output(text, normalize_rules_set):
     return text
 
 def compare_streams(actual_output, expect_element):
-    if expect_element is None:
-        expected_text, match_type, normalize_rules_str = "", "exact", ""
-    else:
-        expected_text, match_type, normalize_rules_str = expect_element.text or "", expect_element.get("match", "exact"), expect_element.get("normalize", "")
+    # This function is now only called if the expect_element is guaranteed to exist.
+    expected_text, match_type, normalize_rules_str = expect_element.text or "", expect_element.get("match", "exact"), expect_element.get("normalize", "")
     
     if not normalize_rules_str:
         normalize_rules = set()
@@ -215,6 +213,8 @@ def compare_streams(actual_output, expect_element):
     return passed, reason, normalized_actual, normalized_expected, {}
 
 def run_command_in_env(command_text, env_vars, working_dir):
+    if not command_text or not command_text.strip():
+        return False, "Schema error: <command> element in setup/teardown cannot be empty or contain only whitespace."
     try:
         subprocess.run(command_text, shell=True, check=True, capture_output=True, text=True, env=env_vars, cwd=working_dir)
         return True, ""
@@ -246,23 +246,25 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
     if (case_env_element := case_element.find("environment")) is not None:
         if (case_work_dir_el := case_env_element.find("working-directory")) is not None and case_work_dir_el.text:
             working_dir = case_work_dir_el.text.strip()
-        # --- MODIFIED PART ---
-        # Look for <variable> elements inside the <variables> wrapper.
         if (variables_el := case_env_element.find("variables")) is not None:
             for var_el in variables_el.findall("variable"):
                 current_env[var_el.get("name")] = var_el.text or ""
-        # --- END MODIFIED PART ---
         if (setup_el := case_env_element.find("setup")) is not None:
             for cmd_el in setup_el.findall("command"):
-                success, msg = run_command_in_env(cmd_el.text.strip(), current_env, working_dir)
-                if not success: return fail_early("Test case setup command failed", {"error": msg})
+                success, msg = run_command_in_env(cmd_el.text, current_env, working_dir)
+                if not success: return fail_early("Test case setup command failed", {"error_type": "ConfigurationError", "error": msg})
     
-    if (command_el := case_element.find("command")) is None or not command_el.text:
-        return fail_early("Missing or empty <command> tag")
-
+    command_el = case_element.find("command")
+    if command_el is None or not command_el.text or not command_el.text.strip():
+        return fail_early("Schema error: Missing or empty <command> tag.", {"error_type": "ConfigurationError"})
+    
     args = [command_el.text.strip()]
+    
     if (args_el := case_element.find("args")) is not None:
-        args.extend(arg_el.text or "" for arg_el in args_el.findall("arg"))
+        for arg_el in args_el.findall("arg"):
+            if not arg_el.text or not arg_el.text.strip():
+                return fail_early("Schema error: <arg> tag cannot be empty or contain only whitespace.", {"error_type": "ConfigurationError"})
+            args.append(arg_el.text)
     
     stdin_data = (stdin_el.text if (stdin_el := case_element.find("stdin")) is not None else None)
 
@@ -278,27 +280,32 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
 
     if (case_env_element := case_element.find("environment")) is not None and (teardown_el := case_env_element.find("teardown")) is not None:
         for cmd_el in teardown_el.findall("command"):
-            success, msg = run_command_in_env(cmd_el.text.strip(), current_env, working_dir)
-            if not success: return fail_early("Test case teardown command failed", {"error": msg})
+            success, msg = run_command_in_env(cmd_el.text, current_env, working_dir)
+            if not success: return fail_early("Test case teardown command failed", {"error_type": "ConfigurationError", "error": msg})
 
     if (expect_el := case_element.find("expect")) is None: return fail_early("Missing <expect> block")
 
-    stdout_passed, stdout_reason, norm_out, norm_exp_out, config_diags = compare_streams(process.stdout, expect_el.find("stdout"))
-    if not stdout_passed:
-        diags = config_diags if config_diags else {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out}
-        message = "Configuration error" if config_diags else "stdout mismatch"
-        return fail_early(message, diags)
+    if not list(expect_el):
+        return fail_early("Schema error: <expect> block cannot be empty.", {"error_type": "ConfigurationError"})
+        
+    if (stdout_expect_el := expect_el.find("stdout")) is not None:
+        stdout_passed, stdout_reason, norm_out, norm_exp_out, config_diags = compare_streams(process.stdout, stdout_expect_el)
+        if not stdout_passed:
+            diags = config_diags if config_diags else {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out}
+            message = "Configuration error" if config_diags else "stdout mismatch"
+            return fail_early(message, diags)
     
-    stderr_passed, stderr_reason, norm_err, norm_exp_err, config_diags = compare_streams(process.stderr, expect_el.find("stderr"))
-    if not stderr_passed:
-        diags = config_diags if config_diags else {"reason": stderr_reason, "expected": norm_exp_err, "got": norm_err}
-        message = "Configuration error" if config_diags else "stderr mismatch"
-        return fail_early(message, diags)
+    if (stderr_expect_el := expect_el.find("stderr")) is not None:
+        stderr_passed, stderr_reason, norm_err, norm_exp_err, config_diags = compare_streams(process.stderr, stderr_expect_el)
+        if not stderr_passed:
+            diags = config_diags if config_diags else {"reason": stderr_reason, "expected": norm_exp_err, "got": norm_err}
+            message = "Configuration error" if config_diags else "stderr mismatch"
+            return fail_early(message, diags)
     
     expected_exit_code = 0
     if (exit_code_el := expect_el.find("exit_code")) is not None and exit_code_el.text:
         try: expected_exit_code = int(exit_code_el.text.strip())
-        except (ValueError, TypeError): return fail_early(f"Invalid <exit_code> value: '{exit_code_el.text}'")
+        except (ValueError, TypeError): return fail_early(f"Invalid <exit_code> value: '{exit_code_el.text}'", {"error_type": "ConfigurationError"})
     
     if process.returncode != expected_exit_code:
         return fail_early("Exit code mismatch", {"expected": str(expected_exit_code), "got": str(process.returncode)})
@@ -329,16 +336,13 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
         if (work_dir_el := suite_env_el.find("working-directory")) is not None and work_dir_el.text:
             suite_env["working_dir"] = work_dir_el.text.strip()
         setup_env = os.environ.copy()
-        # --- MODIFIED PART ---
-        # Look for <variable> elements inside the <variables> wrapper.
         if (variables_el := suite_env_el.find("variables")) is not None:
             for var_el in variables_el.findall("variable"):
                 suite_env["variables"][var_el.get("name")] = var_el.text or ""
-        # --- END MODIFIED PART ---
         setup_env.update(suite_env["variables"])
         if (setup_el := suite_env_el.find("setup")) is not None:
             for cmd_el in setup_el.findall("command"):
-                success, msg = run_command_in_env(cmd_el.text.strip(), setup_env, suite_env["working_dir"])
+                success, msg = run_command_in_env(cmd_el.text, setup_env, suite_env["working_dir"])
                 if not success:
                     suite_result.error = f"Suite setup failed: {msg}"
                     suite_result.duration = time.time() - start_time
@@ -361,7 +365,7 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
         teardown_env = os.environ.copy()
         teardown_env.update(suite_env["variables"])
         for cmd_el in teardown_el.findall("command"):
-            run_command_in_env(cmd_el.text.strip(), teardown_env, suite_env["working_dir"])
+            run_command_in_env(cmd_el.text, teardown_env, suite_env["working_dir"])
     
     suite_result.duration = time.time() - start_time
     return suite_result
