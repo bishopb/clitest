@@ -55,7 +55,7 @@
         <arg>suites/suite-normalize-invalid.xml</arg>
       </args>
       <expect>
-        <stderr match="contains">&lt;stdout&gt; has invalid 'normalize' keyword(s): ['foo']</stderr>
+        <stderr match="contains"><![CDATA[<stdout>: has invalid 'normalize' keyword(s): ['foo']]]></stderr>
         <exit_code>2</exit_code>
       </expect>
     </test-case>
@@ -107,7 +107,7 @@
         <arg>suites/suite-invalid.xml</arg>
       </args>
       <expect>
-        <stderr match="regex">(?s)Error: Validation failed for suite 'suites/suite-invalid.xml':.*- XML is not well-formed: mismatched tag: line 8, column 2</stderr>
+        <stderr match="regex">(?s)Error: Validation failed for suite 'suites/suite-invalid.xml':.*mismatched tag: line 8, column 2</stderr>
         <exit_code>2</exit_code>
       </expect>
     </test-case>

@@ -189,113 +189,85 @@ class SpecReporter:
                 print()
 
 
-# --- Manual Validation Logic ---
+# --- Manual Validation Logic (Corrected Refactor) ---
 
-def _is_non_empty_string(text):
-    return text and text.strip()
+def _v_non_empty_text(el): assert el is not None and el.text and el.text.strip(), "tag cannot be empty."
+def _v_is_float(val): float(val)
+def _v_is_int_text(el): int(el.text.strip())
+def _v_match_attr(val): assert val in {'exact', 'contains', 'regex'}, f"has invalid 'match' attribute value: '{val}'"
+def _v_has_children(el): assert list(el), "block cannot be empty."
+def _v_args_have_children(el): assert el.findall('arg'), "must contain at least one <arg> tag."
+def _v_normalize_attr(val):
+    rules = {rule.strip().lower() for rule in val.split(',') if rule.strip()}
+    invalid = rules - VALID_NORMALIZERS
+    assert not invalid, f"has invalid 'normalize' keyword(s): {sorted(list(invalid))}"
 
-def _validate_element(element, known_children, known_attrs):
-    """Helper to check for unknown children and attributes."""
-    errors = []
-    child_tags = {child.tag for child in element}
-    unknown_children = child_tags - known_children
-    if unknown_children:
-        errors.append(f"<{element.tag}> contains unknown child element(s): {sorted(list(unknown_children))}")
+SCHEMA = {
+    'test-suite':   {'attrs': {'description', 'timeout'}, 'children': {'environment': (0, 1), 'test-cases': (1, 1)}, 'validators': {'timeout': _v_is_float}},
+    'environment':  {'attrs': set(), 'children': {'working-directory': (0, 1), 'variables': (0, 1), 'setup': (0, 1), 'teardown': (0, 1)}},
+    'working-directory': {'validators': {'_self': _v_non_empty_text}},
+    'variables':    {'children': {'variable': (0, None)}},
+    'variable':     {'attrs': {'name'}},
+    'setup':        {'children': {'command': (1, None)}},
+    'teardown':     {'children': {'command': (1, None)}},
+    'test-cases':   {'children': {'test-case': (0, None)}, 'validators': {'_self': _v_has_children}},
+    'test-case':    {'attrs': {'description', 'timeout'}, 'children': {'environment': (0, 1), 'command': (1, 1), 'args': (0, 1), 'stdin': (0, 1), 'expect': (1, 1)},
+                     'validators': {'timeout': _v_is_float, 'command': _v_non_empty_text, 'args': _v_args_have_children}},
+    'command':      {'validators': {'_self': _v_non_empty_text}},
+    'args':         {'children': {'arg': (1, None)}},
+    'arg':          {'validators': {'_self': _v_non_empty_text}},
+    'stdin':        {},
+    'expect':       {'children': {'stdout': (0, 1), 'stderr': (0, 1), 'exit_code': (0, 1)}, 'validators': {'_self': _v_has_children}},
+    'stdout':       {'attrs': {'match', 'normalize'}, 'validators': {'match': _v_match_attr, 'normalize': _v_normalize_attr}},
+    'stderr':       {'attrs': {'match', 'normalize'}, 'validators': {'match': _v_match_attr, 'normalize': _v_normalize_attr}},
+    'exit_code':    {'validators': {'_self': _v_is_int_text}},
+}
 
-    unknown_attrs = set(element.attrib.keys()) - known_attrs
-    if unknown_attrs:
-        errors.append(f"<{element.tag}> contains unknown attribute(s): {sorted(list(unknown_attrs))}")
-    return errors
+def _validate_element_recursively(element):
+    """Recursively validates an element against the SCHEMA, raising exceptions on failure."""
+    if element.tag not in SCHEMA: raise AssertionError(f"Unknown element <{element.tag}>")
+    rule = SCHEMA[element.tag]
+    
+    if unknown_attrs := set(element.attrib) - rule.get('attrs', set()):
+        raise AssertionError(f"<{element.tag}> contains unknown attribute(s): {sorted(list(unknown_attrs))}")
 
-def _validate_stream(element):
-    errors = _validate_element(element, known_children=set(), known_attrs={'match', 'normalize'})
-    if 'match' in element.attrib and element.get('match') not in {'exact', 'contains', 'regex'}:
-        errors.append(f"<{element.tag}> has invalid 'match' attribute value: '{element.get('match')}'")
+    known_children = rule.get('children', {})
+    child_tags = [child.tag for child in element]
+    if unknown_children := set(child_tags) - set(known_children.keys()):
+        raise AssertionError(f"<{element.tag}> contains unknown child element(s): {sorted(list(unknown_children))}")
 
-    # This is the "Phase 2" semantic validation for normalize
-    if 'normalize' in element.attrib:
-        rules = {rule.strip().lower() for rule in element.get('normalize', '').split(',') if rule.strip()}
-        invalid_rules = rules - VALID_NORMALIZERS
-        if invalid_rules:
-            errors.append(f"<{element.tag}> has invalid 'normalize' keyword(s): {sorted(list(invalid_rules))}")
-    return errors
+    for tag, (min_c, max_c) in known_children.items():
+        count = child_tags.count(tag)
+        if not (min_c <= count and (max_c is None or count <= max_c)):
+            expected = f"{min_c} and {'many' if max_c is None else max_c}"
+            raise AssertionError(f"<{element.tag}> must have between {expected} <{tag}> children, but found {count}.")
 
-def _validate_expect(element):
-    errors = _validate_element(element, known_children={'stdout', 'stderr', 'exit_code'}, known_attrs=set())
-    if not list(element):
-        errors.append("<expect> block cannot be empty.")
-
-    for child_tag in ['stdout', 'stderr', 'exit_code']:
-        if len(element.findall(child_tag)) > 1:
-            errors.append(f"<expect> block has multiple <{child_tag}> children; only one is allowed.")
-
-    if (el := element.find('stdout')) is not None: errors.extend(_validate_stream(el))
-    if (el := element.find('stderr')) is not None: errors.extend(_validate_stream(el))
-    if (el := element.find('exit_code')) is not None:
+    for key, validator in rule.get('validators', {}).items():
         try:
-            int(el.text.strip())
-        except (ValueError, AttributeError):
-            errors.append("<exit_code> must contain a valid integer.")
-    return errors
-
-def _validate_test_case(element):
-    known_children = {'environment', 'command', 'args', 'stdin', 'expect'}
-    errors = _validate_element(element, known_children, {'description', 'timeout'})
-
-    if (timeout_str := element.get('timeout')):
-        try: float(timeout_str)
-        except (ValueError, TypeError): errors.append("<test-case> has an invalid 'timeout' attribute.")
-
-    if (cmd := element.find('command')) is None:
-        errors.append("<test-case> is missing required <command> child.")
-    elif not _is_non_empty_string(cmd.text):
-        errors.append("<command> tag cannot be empty.")
-
-    if (args_el := element.find('args')) is not None:
-        if not args_el.findall('arg'):
-                 errors.append("<args> must contain at least one <arg> tag.")
-        for arg in args_el.findall('arg'):
-            if not _is_non_empty_string(arg.text):
-                errors.append("<arg> tag cannot be empty.")
-
-    if (expect := element.find('expect')) is None:
-        errors.append("<test-case> is missing required <expect> child.")
-    else:
-        errors.extend(_validate_expect(expect))
-
-    return errors
+            if key == '_self': validator(element)
+            elif key in element.attrib: validator(element.get(key))
+            elif (child := element.find(key)) is not None: validator(child)
+        except (AssertionError, ValueError, TypeError) as e:
+            msg = str(e) or f"failed validation check '{validator.__name__}'"
+            raise AssertionError(f"Validation failed on <{element.tag}>: {msg}") from e
+    
+    for child in element:
+        _validate_element_recursively(child)
 
 def validate_suite_manually(suite_path):
-    """Manually validate a suite file against the schema rules."""
+    """Manually validate a suite file against the data-driven schema."""
     try:
         tree = ET.parse(suite_path)
         root = tree.getroot()
-    except ET.ParseError as e:
-        return None, [f"XML is not well-formed: {e}"]
+        if root.tag != 'test-suite':
+            return None, [f"Invalid root element. Expected <test-suite>, but found <{root.tag}>."]
+        _validate_element_recursively(root)
+        return tree, []
+    except (AssertionError, ET.ParseError) as e:
+        return None, [str(e)]
 
-    errors = []
-    if root.tag != 'test-suite':
-        return None, [f"Invalid root element. Expected <test-suite>, but found <{root.tag}>."]
 
-    errors.extend(_validate_element(root, {'environment', 'test-cases'}, {'description', 'timeout'}))
-    if (timeout_str := root.get('timeout')):
-        try: float(timeout_str)
-        except (ValueError, TypeError): errors.append("<test-suite> has an invalid 'timeout' attribute.")
-
-    if (tc_wrapper := root.find('test-cases')) is None:
-        errors.append("<test-suite> is missing required <test-cases> child.")
-    else:
-        errors.extend(_validate_element(tc_wrapper, {'test-case'}, set()))
-        for i, case_el in enumerate(tc_wrapper.findall('test-case')):
-            case_errors = _validate_test_case(case_el)
-            if case_errors:
-                desc = case_el.get('description', f'at index {i}')
-                errors.append(f"Invalid test case '{desc}':")
-                errors.extend([f"  - {e}" for e in case_errors])
-
-    return tree, errors
-
-# --- Test Execution Logic (Refactored) ---
+# --- Test Execution Logic ---
 
 def normalize_output(text, normalize_rules_set):
     if not text: return ""
@@ -304,13 +276,10 @@ def normalize_output(text, normalize_rules_set):
     return text
 
 def compare_streams(actual_output, expect_element):
-    # This function is now only called if the expect_element is guaranteed to exist and be valid.
     expected_text = expect_element.text or ""
     match_type = expect_element.get("match", "exact")
     normalize_rules_str = expect_element.get("normalize", "")
-
     normalize_rules = {rule.strip().lower() for rule in normalize_rules_str.split(',') if rule.strip()}
-
     normalized_actual = normalize_output(actual_output, normalize_rules)
     normalized_expected = normalize_output(expected_text, normalize_rules) if "whitespace" in normalize_rules else expected_text
 
@@ -318,7 +287,7 @@ def compare_streams(actual_output, expect_element):
     if match_type == "exact" and normalized_actual == normalized_expected: passed = True
     elif match_type == "contains" and normalized_expected in normalized_actual: passed = True
     elif match_type == "regex" and re.search(normalized_expected, normalized_actual): passed = True
-
+    
     reason = f"'{match_type}' match failed" if not passed else ""
     return passed, reason, normalized_actual, normalized_expected, {}
 
@@ -346,7 +315,7 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
 
     timeout_val = suite_env.get("timeout", None)
     if (case_timeout_str := case_element.get("timeout")):
-        timeout_val = float(case_timeout_str) # Validation ensures this is a valid decimal/float
+        timeout_val = float(case_timeout_str)
 
     if (case_env_element := case_element.find("environment")) is not None:
         if (case_work_dir_el := case_env_element.find("working-directory")) is not None and case_work_dir_el.text:
@@ -359,13 +328,11 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
                 success, msg = run_command_in_env(cmd_el.text, current_env, working_dir)
                 if not success: return fail_early("Test case setup command failed", {"error_type": "ConfigurationError", "error": msg})
 
-    command_el = case_element.find("command") # Guaranteed to exist by validation
-
+    command_el = case_element.find("command")
     args = [command_el.text.strip()]
-
     if (args_el := case_element.find("args")) is not None:
         for arg_el in args_el.findall("arg"):
-            args.append(arg_el.text) # Guaranteed non-empty by validation
+            args.append(arg_el.text)
 
     stdin_data = (stdin_el.text if (stdin_el := case_element.find("stdin")) is not None else None)
 
@@ -384,7 +351,7 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
             success, msg = run_command_in_env(cmd_el.text, current_env, working_dir)
             if not success: return fail_early("Test case teardown command failed", {"error_type": "ConfigurationError", "error": msg})
 
-    expect_el = case_element.find("expect") # Guaranteed to exist by validation
+    expect_el = case_element.find("expect")
 
     if (stdout_expect_el := expect_el.find("stdout")) is not None:
         stdout_passed, stdout_reason, norm_out, norm_exp_out, _ = compare_streams(process.stdout, stdout_expect_el)
@@ -399,8 +366,7 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
             return fail_early("stderr mismatch", diags)
 
     if (exit_code_el := expect_el.find("exit_code")) is not None:
-        expected_exit_code = int(exit_code_el.text.strip()) # Validation ensures this is an int
-
+        expected_exit_code = int(exit_code_el.text.strip())
         if process.returncode != expected_exit_code:
             return fail_early("Exit code mismatch", {"expected": str(expected_exit_code), "got": str(process.returncode)})
 
@@ -434,13 +400,13 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
                     return suite_result
 
     test_cases_wrapper = root.find('test-cases')
-
-    for case_el in test_cases_wrapper.findall('test-case'):
-        log_messages = []
-        if args.verbose:
-            description = case_el.get("description", "Unnamed Test Case")
-            log_messages.append(f"# Executing case: {description}")
-        suite_result.test_cases.append(run_test_case(case_el, suite_env, log_messages))
+    if test_cases_wrapper is not None:
+        for case_el in test_cases_wrapper.findall('test-case'):
+            log_messages = []
+            if args.verbose:
+                description = case_el.get("description", "Unnamed Test Case")
+                log_messages.append(f"# Executing case: {description}")
+            suite_result.test_cases.append(run_test_case(case_el, suite_env, log_messages))
 
     if (suite_env_el := root.find("environment")) is not None and (teardown_el := suite_env_el.find("teardown")) is not None:
         teardown_env = os.environ.copy()
@@ -455,11 +421,11 @@ def list_cases(parsed_trees):
     print("The following tests would be run:")
     for path, tree in parsed_trees.items():
         root = tree.getroot()
-
         suite_description = root.get("description", path)
         print(f"\nSuite: {suite_description}")
 
         test_cases_wrapper = root.find('test-cases')
+        if test_cases_wrapper is None: continue
         test_cases = test_cases_wrapper.findall('test-case')
 
         if not test_cases:
@@ -478,7 +444,6 @@ def main():
     mode_group.add_argument('--list-cases', action='store_true', help='List all test cases that would be run without executing them.')
 
     parser.add_argument('--reporter', choices=['tap', 'junit', 'spec'], default='spec', help='The output format for test results (default: %(default)s).')
-
     args = parser.parse_args()
 
     parsed_trees = {}
@@ -496,7 +461,6 @@ def main():
                 print(f"  - {error}", file=sys.stderr)
             has_errors = True
             continue
-
         parsed_trees[suite_path] = tree
 
     if has_errors:
