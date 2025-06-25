@@ -83,7 +83,7 @@ options:
 
 * `clitest.py` is invoked from the command line, specifying one or more test suite files.
 * `clitest.py` runs the tests given by the test suite files arguments, unless the `--list-cases` option is given, in which case only the cases that would be run are displayed.
-* `clitest.py` shows the test results in `spec` output be default, but can be switched to `tap` or `junit` with the `--reporter` option.
+* `clitest.py` shows the test results in `spec` output by default, but can be switched to `tap` or `junit` with the `--reporter` option.
 
 ## Test Suite XML Specification
 
