@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# clitest.py - A generic, language-agnostic command-line test runner.
+# clitest.py - Test any command line program against a test suite you define.
 
 import sys
 import os
