@@ -285,6 +285,7 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
 
     if (expect_el := case_element.find("expect")) is None: return fail_early("Missing <expect> block")
 
+    # REQUIREMENT (a): This check correctly ensures that the <expect> block has at least one child. No changes were needed here.
     if not list(expect_el):
         return fail_early("Schema error: <expect> block cannot be empty.", {"error_type": "ConfigurationError"})
         
@@ -302,13 +303,16 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
             message = "Configuration error" if config_diags else "stderr mismatch"
             return fail_early(message, diags)
     
-    expected_exit_code = 0
-    if (exit_code_el := expect_el.find("exit_code")) is not None and exit_code_el.text:
-        try: expected_exit_code = int(exit_code_el.text.strip())
-        except (ValueError, TypeError): return fail_early(f"Invalid <exit_code> value: '{exit_code_el.text}'", {"error_type": "ConfigurationError"})
-    
-    if process.returncode != expected_exit_code:
-        return fail_early("Exit code mismatch", {"expected": str(expected_exit_code), "got": str(process.returncode)})
+    if (exit_code_el := expect_el.find("exit_code")) is not None:
+        expected_exit_code = 0  # Default to 0 if the tag exists but is empty (e.g., <exit_code/>)
+        if exit_code_el.text and exit_code_el.text.strip():
+            try:
+                expected_exit_code = int(exit_code_el.text.strip())
+            except (ValueError, TypeError):
+                return fail_early(f"Invalid <exit_code> value: '{exit_code_el.text}'", {"error_type": "ConfigurationError"})
+        
+        if process.returncode != expected_exit_code:
+            return fail_early("Exit code mismatch", {"expected": str(expected_exit_code), "got": str(process.returncode)})
             
     return TestCaseResult(description, classname, passed=True, duration=time.time() - start_time, log=log)
 
