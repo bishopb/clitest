@@ -97,7 +97,7 @@ In short:
 
 ### Verifying a Test Suite
 
-The `xmllint` tool can validate a test suite XML file you create against the clitest test suite XML schema definition, like so:
+`clitest.py` validates the given XML is well-formed as per the schema prior to list or executing test cases, but you can also use an external tool to validate against the schema, like:
 
 ```sh
 $ xmllint --noout --schema clitest-schema.xsd yourapp-feature-tests.xml
