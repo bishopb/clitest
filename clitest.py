@@ -1,13 +1,5 @@
 # clitest.py - Test any command line program against a test suite you define.
 
-# This program allows you to define a suite of tests in one or more XML "test
-# suite" files, execute them against a command line program under test, and then
-# report the results in various formats.
-#
-# Do not run it with an XML test suite file that you have not fully vetted. It
-# is a powerful tool for a trusted development environment, but it is not
-# hardened against malicious input.
-
 import sys
 import os
 import argparse
@@ -16,6 +8,8 @@ import re
 import xml.etree.ElementTree as ET
 import time
 import html
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
 
 # --- Constants for Exit Codes ---
 EXIT_CODE_SUCCESS = 0
@@ -45,25 +39,25 @@ class Ansi:
 
 # --- Data Classes for Results ---
 
+@dataclass
 class TestCaseResult:
     """A simple class to hold the result of a single test case."""
-    def __init__(self, description, classname, passed=False, message="", diagnostics=None, duration=0, log=None):
-        self.description = description
-        self.classname = classname
-        self.passed = passed
-        self.message = message
-        self.diagnostics = diagnostics if diagnostics is not None else {}
-        self.duration = duration
-        self.log = log if log is not None else []
+    description: str
+    classname: str
+    passed: bool = False
+    message: str = ""
+    diagnostics: Dict[str, Any] = field(default_factory=dict)
+    duration: float = 0.0
+    log: List[str] = field(default_factory=list)
 
+@dataclass
 class SuiteResult:
     """A simple class to hold the results of a test suite."""
-    def __init__(self, description, path, test_cases=None, duration=0, error=""):
-        self.description = description
-        self.path = path
-        self.test_cases = test_cases if test_cases is not None else []
-        self.duration = duration
-        self.error = error
+    description: str
+    path: str
+    test_cases: List[TestCaseResult] = field(default_factory=list)
+    duration: float = 0.0
+    error: str = ""
 
     @property
     def num_tests(self):
@@ -72,6 +66,7 @@ class SuiteResult:
     @property
     def num_failures(self):
         return len([tc for tc in self.test_cases if not tc.passed])
+
 
 # --- Reporter Classes ---
 
@@ -155,7 +150,7 @@ class SpecReporter:
     def render(self, suite_results, args):
         failures = []
         total_tests = 0
-        
+
         for suite_result in suite_results:
             print(f"\n  {Ansi.cyan(suite_result.description)}")
             if suite_result.error:
@@ -166,7 +161,7 @@ class SpecReporter:
                 total_tests += 1
                 for log_line in tc.log:
                     print(f"    {log_line}", file=sys.stderr)
-                
+
                 if tc.passed:
                     print(f"    {Ansi.green('✓')} {tc.description}")
                 else:
@@ -198,7 +193,7 @@ def _validate_element(element, known_children, known_attrs):
     unknown_children = child_tags - known_children
     if unknown_children:
         errors.append(f"<{element.tag}> contains unknown child element(s): {sorted(list(unknown_children))}")
-    
+
     unknown_attrs = set(element.attrib.keys()) - known_attrs
     if unknown_attrs:
         errors.append(f"<{element.tag}> contains unknown attribute(s): {sorted(list(unknown_attrs))}")
@@ -208,7 +203,7 @@ def _validate_stream(element):
     errors = _validate_element(element, known_children=set(), known_attrs={'match', 'normalize'})
     if 'match' in element.attrib and element.get('match') not in {'exact', 'contains', 'regex'}:
         errors.append(f"<{element.tag}> has invalid 'match' attribute value: '{element.get('match')}'")
-    
+
     # This is the "Phase 2" semantic validation for normalize
     if 'normalize' in element.attrib:
         rules = {rule.strip().lower() for rule in element.get('normalize', '').split(',') if rule.strip()}
@@ -221,7 +216,7 @@ def _validate_expect(element):
     errors = _validate_element(element, known_children={'stdout', 'stderr', 'exit_code'}, known_attrs=set())
     if not list(element):
         errors.append("<expect> block cannot be empty.")
-    
+
     for child_tag in ['stdout', 'stderr', 'exit_code']:
         if len(element.findall(child_tag)) > 1:
             errors.append(f"<expect> block has multiple <{child_tag}> children; only one is allowed.")
@@ -238,7 +233,7 @@ def _validate_expect(element):
 def _validate_test_case(element):
     known_children = {'environment', 'command', 'args', 'stdin', 'expect'}
     errors = _validate_element(element, known_children, {'description', 'timeout'})
-    
+
     if (timeout_str := element.get('timeout')):
         try: float(timeout_str)
         except (ValueError, TypeError): errors.append("<test-case> has an invalid 'timeout' attribute.")
@@ -250,16 +245,16 @@ def _validate_test_case(element):
 
     if (args_el := element.find('args')) is not None:
         if not args_el.findall('arg'):
-             errors.append("<args> must contain at least one <arg> tag.")
+                 errors.append("<args> must contain at least one <arg> tag.")
         for arg in args_el.findall('arg'):
             if not _is_non_empty_string(arg.text):
                 errors.append("<arg> tag cannot be empty.")
-    
+
     if (expect := element.find('expect')) is None:
         errors.append("<test-case> is missing required <expect> child.")
     else:
         errors.extend(_validate_expect(expect))
-    
+
     return errors
 
 def validate_suite_manually(suite_path):
@@ -269,7 +264,7 @@ def validate_suite_manually(suite_path):
         root = tree.getroot()
     except ET.ParseError as e:
         return None, [f"XML is not well-formed: {e}"]
-    
+
     errors = []
     if root.tag != 'test-suite':
         return None, [f"Invalid root element. Expected <test-suite>, but found <{root.tag}>."]
@@ -305,9 +300,9 @@ def compare_streams(actual_output, expect_element):
     expected_text = expect_element.text or ""
     match_type = expect_element.get("match", "exact")
     normalize_rules_str = expect_element.get("normalize", "")
-    
+
     normalize_rules = {rule.strip().lower() for rule in normalize_rules_str.split(',') if rule.strip()}
-    
+
     normalized_actual = normalize_output(actual_output, normalize_rules)
     normalized_expected = normalize_output(expected_text, normalize_rules) if "whitespace" in normalize_rules else expected_text
 
@@ -315,7 +310,7 @@ def compare_streams(actual_output, expect_element):
     if match_type == "exact" and normalized_actual == normalized_expected: passed = True
     elif match_type == "contains" and normalized_expected in normalized_actual: passed = True
     elif match_type == "regex" and re.search(normalized_expected, normalized_actual): passed = True
-    
+
     reason = f"'{match_type}' match failed" if not passed else ""
     return passed, reason, normalized_actual, normalized_expected, {}
 
@@ -340,7 +335,7 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
 
     current_env, working_dir = os.environ.copy(), suite_env.get("working_dir")
     current_env.update(suite_env.get("variables", {}))
-    
+
     timeout_val = suite_env.get("timeout", None)
     if (case_timeout_str := case_element.get("timeout")):
         timeout_val = float(case_timeout_str) # Validation ensures this is a valid decimal/float
@@ -355,15 +350,15 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
             for cmd_el in setup_el.findall("command"):
                 success, msg = run_command_in_env(cmd_el.text, current_env, working_dir)
                 if not success: return fail_early("Test case setup command failed", {"error_type": "ConfigurationError", "error": msg})
-    
+
     command_el = case_element.find("command") # Guaranteed to exist by validation
-    
+
     args = [command_el.text.strip()]
-    
+
     if (args_el := case_element.find("args")) is not None:
         for arg_el in args_el.findall("arg"):
             args.append(arg_el.text) # Guaranteed non-empty by validation
-    
+
     stdin_data = (stdin_el.text if (stdin_el := case_element.find("stdin")) is not None else None)
 
     try:
@@ -382,25 +377,25 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
             if not success: return fail_early("Test case teardown command failed", {"error_type": "ConfigurationError", "error": msg})
 
     expect_el = case_element.find("expect") # Guaranteed to exist by validation
-    
+
     if (stdout_expect_el := expect_el.find("stdout")) is not None:
         stdout_passed, stdout_reason, norm_out, norm_exp_out, _ = compare_streams(process.stdout, stdout_expect_el)
         if not stdout_passed:
             diags = {"reason": stdout_reason, "expected": norm_exp_out, "got": norm_out}
             return fail_early("stdout mismatch", diags)
-    
+
     if (stderr_expect_el := expect_el.find("stderr")) is not None:
         stderr_passed, stderr_reason, norm_err, norm_exp_err, _ = compare_streams(process.stderr, stderr_expect_el)
         if not stderr_passed:
             diags = {"reason": stderr_reason, "expected": norm_exp_err, "got": norm_err}
             return fail_early("stderr mismatch", diags)
-    
+
     if (exit_code_el := expect_el.find("exit_code")) is not None:
         expected_exit_code = int(exit_code_el.text.strip()) # Validation ensures this is an int
-        
+
         if process.returncode != expected_exit_code:
             return fail_early("Exit code mismatch", {"expected": str(expected_exit_code), "got": str(process.returncode)})
-            
+
     return TestCaseResult(description, classname, passed=True, duration=time.time() - start_time, log=log)
 
 def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
@@ -410,7 +405,7 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
     suite_result = SuiteResult(suite_description, suite_path)
 
     suite_env = {"variables": {}, "working_dir": None, "description": suite_description, "timeout": None}
-    
+
     if (suite_timeout_str := root.get("timeout")):
         suite_env["timeout"] = float(suite_timeout_str)
 
@@ -444,7 +439,7 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
         teardown_env.update(suite_env["variables"])
         for cmd_el in teardown_el.findall("command"):
             run_command_in_env(cmd_el.text, teardown_env, suite_env["working_dir"])
-    
+
     suite_result.duration = time.time() - start_time
     return suite_result
 
@@ -452,13 +447,13 @@ def list_cases(parsed_trees):
     print("The following tests would be run:")
     for path, tree in parsed_trees.items():
         root = tree.getroot()
-        
+
         suite_description = root.get("description", path)
         print(f"\nSuite: {suite_description}")
 
         test_cases_wrapper = root.find('test-cases')
         test_cases = test_cases_wrapper.findall('test-case')
-        
+
         if not test_cases:
             print("  (No test cases found)")
             continue
@@ -468,14 +463,14 @@ def list_cases(parsed_trees):
 def main():
     parser = argparse.ArgumentParser(description="A generic, language-agnostic command-line test runner.", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('suites', metavar='SUITE', nargs='+', help='One or more paths to test suite XML files.')
-    
+
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output.')
     mode_group.add_argument('-q', '--quiet', action='store_true', help='Enable quiet output.')
     mode_group.add_argument('--list-cases', action='store_true', help='List all test cases that would be run without executing them.')
-    
+
     parser.add_argument('--reporter', choices=['tap', 'junit', 'spec'], default='spec', help='The output format for test results (default: %(default)s).')
-    
+
     args = parser.parse_args()
 
     parsed_trees = {}
@@ -485,7 +480,7 @@ def main():
             print(f"Error: File not found: '{suite_path}'", file=sys.stderr)
             has_errors = True
             continue
-        
+
         tree, errors = validate_suite_manually(suite_path)
         if errors:
             print(f"Error: Validation failed for suite '{suite_path}':", file=sys.stderr)
@@ -495,7 +490,7 @@ def main():
             continue
 
         parsed_trees[suite_path] = tree
-    
+
     if has_errors:
         return EXIT_CODE_RUNTIME_ERROR
 
