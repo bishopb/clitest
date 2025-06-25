@@ -172,10 +172,10 @@ class SpecReporter:
             print(f"\n  {Ansi.red('Failure Details:')}\n")
             for i, tc in enumerate(failures):
                 print(f"  {i+1}) {Ansi.red(tc.description)}")
-                print(f"     {Ansi.yellow('Message:')} {tc.message}")
+                print(f"      {Ansi.yellow('Message:')} {tc.message}")
                 if tc.diagnostics:
                     for key, value in tc.diagnostics.items():
-                        print(f"     {Ansi.yellow(f'{key.capitalize()}:')} {value}")
+                        print(f"      {Ansi.yellow(f'{key.capitalize()}:')} {value}")
                 print()
 
 
@@ -242,7 +242,7 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
         try:
             timeout_val = float(case_timeout_str)
         except (ValueError, TypeError):
-             return fail_early(f"Invalid timeout value on test case: '{case_timeout_str}'")
+            return fail_early(f"Invalid timeout value on test case: '{case_timeout_str}'")
 
     if (case_env_element := case_element.find("environment")) is not None:
         if (case_work_dir_el := case_env_element.find("working-directory")) is not None and case_work_dir_el.text:
@@ -309,6 +309,11 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
     suite_description = root.get("description", suite_path)
     suite_result = SuiteResult(suite_description, suite_path)
 
+    if root.tag != 'test-suite':
+        suite_result.error = f"Structure error: Invalid root element. Expected <test-suite>, but found <{root.tag}>."
+        suite_result.duration = time.time() - start_time
+        return suite_result
+
     suite_env = {"variables": {}, "working_dir": None, "description": suite_description, "timeout": None}
     
     if (suite_timeout_str := root.get("timeout")):
@@ -333,7 +338,13 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
                     suite_result.duration = time.time() - start_time
                     return suite_result
 
-    for case_el in (root.findall("./test-cases/test-case") or root.findall("test-case")):
+    test_cases_wrapper = root.find('test-cases')
+    if test_cases_wrapper is None:
+        suite_result.error = "Structure error: Missing required <test-cases> wrapper element."
+        suite_result.duration = time.time() - start_time
+        return suite_result
+
+    for case_el in test_cases_wrapper.findall('test-case'):
         log_messages = []
         if args.verbose:
             description = case_el.get("description", "Unnamed Test Case")
@@ -353,9 +364,23 @@ def list_tests(parsed_trees):
     print("The following tests would be run:")
     for path, tree in parsed_trees.items():
         root = tree.getroot()
+
+        if root.tag != 'test-suite':
+            suite_description = os.path.basename(path)
+            print(f"\nSuite: {suite_description} - {Ansi.red('ERROR')}")
+            print(f"  {Ansi.red(f'Structure error: Invalid root element. Expected <test-suite>, but found <{root.tag}>.')}")
+            continue
+        
         suite_description = root.get("description", path)
         print(f"\nSuite: {suite_description}")
-        test_cases = root.findall("./test-cases/test-case") or root.findall("test-case")
+
+        # FIX #1: Enforce the <test-cases> wrapper element
+        test_cases_wrapper = root.find('test-cases')
+        if test_cases_wrapper is None:
+            print(f"  {Ansi.red('(Structure error: Missing required <test-cases> wrapper element.)')}")
+            continue
+        test_cases = test_cases_wrapper.findall('test-case')
+        
         if not test_cases:
             print("  (No test cases found)")
             continue
@@ -403,4 +428,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
