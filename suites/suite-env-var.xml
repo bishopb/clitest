@@ -1,5 +1,9 @@
 <test-suite>
-  <environment><variable name="SECRET_MESSAGE">Hello Env</variable></environment>
+  <environment>
+    <variables>
+      <variable name="SECRET_MESSAGE">Hello Env</variable>
+    </variables>
+  </environment>
   <test-cases>
     <test-case description="Environment variable test">
       <command>./helpers/env.sh</command>

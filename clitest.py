@@ -246,8 +246,12 @@ def run_test_case(case_element, suite_env, log_messages=None) -> TestCaseResult:
     if (case_env_element := case_element.find("environment")) is not None:
         if (case_work_dir_el := case_env_element.find("working-directory")) is not None and case_work_dir_el.text:
             working_dir = case_work_dir_el.text.strip()
-        for var_el in case_env_element.findall("variable"):
-            current_env[var_el.get("name")] = var_el.text or ""
+        # --- MODIFIED PART ---
+        # Look for <variable> elements inside the <variables> wrapper.
+        if (variables_el := case_env_element.find("variables")) is not None:
+            for var_el in variables_el.findall("variable"):
+                current_env[var_el.get("name")] = var_el.text or ""
+        # --- END MODIFIED PART ---
         if (setup_el := case_env_element.find("setup")) is not None:
             for cmd_el in setup_el.findall("command"):
                 success, msg = run_command_in_env(cmd_el.text.strip(), current_env, working_dir)
@@ -325,8 +329,12 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
         if (work_dir_el := suite_env_el.find("working-directory")) is not None and work_dir_el.text:
             suite_env["working_dir"] = work_dir_el.text.strip()
         setup_env = os.environ.copy()
-        for var_el in suite_env_el.findall("variable"):
-            suite_env["variables"][var_el.get("name")] = var_el.text or ""
+        # --- MODIFIED PART ---
+        # Look for <variable> elements inside the <variables> wrapper.
+        if (variables_el := suite_env_el.find("variables")) is not None:
+            for var_el in variables_el.findall("variable"):
+                suite_env["variables"][var_el.get("name")] = var_el.text or ""
+        # --- END MODIFIED PART ---
         setup_env.update(suite_env["variables"])
         if (setup_el := suite_env_el.find("setup")) is not None:
             for cmd_el in setup_el.findall("command"):

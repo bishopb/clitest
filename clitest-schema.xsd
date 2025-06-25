@@ -27,13 +27,19 @@
 
     <xs:complexType name="environmentType">
         <xs:all>
-            <xs:element name="variable" minOccurs="0">
+            <xs:element name="variables" minOccurs="0" maxOccurs="1">
                 <xs:complexType>
-                    <xs:simpleContent>
-                        <xs:extension base="xs:string">
-                            <xs:attribute name="name" type="xs:string" use="required"/>
-                        </xs:extension>
-                    </xs:simpleContent>
+                    <xs:sequence>
+                        <xs:element name="variable" minOccurs="0" maxOccurs="unbounded">
+                            <xs:complexType>
+                                <xs:simpleContent>
+                                    <xs:extension base="xs:string">
+                                        <xs:attribute name="name" type="xs:string" use="required"/>
+                                    </xs:extension>
+                                </xs:simpleContent>
+                            </xs:complexType>
+                        </xs:element>
+                    </xs:sequence>
                 </xs:complexType>
             </xs:element>
             <xs:element name="working-directory" type="xs:string" minOccurs="0" maxOccurs="1"/>
@@ -57,7 +63,7 @@
     <xs:complexType name="testCaseType">
         <xs:all>
             <xs:element name="environment" type="environmentType" minOccurs="0" maxOccurs="1"/>
-            <xs:element name="command" type="xs:string" minOccurs="1" maxOccurs="1"/>
+            <xs:element name="command" type="nonEmptyString" minOccurs="1" maxOccurs="1"/>
             <xs:element name="args" minOccurs="0" maxOccurs="1">
                 <xs:complexType>
                     <xs:sequence>
@@ -81,7 +87,7 @@
     </xs:complexType>
 
     <xs:complexType name="testSuiteType">
-        <xs:sequence>
+        <xs:all>
             <xs:element name="environment" type="environmentType" minOccurs="0" maxOccurs="1"/>
             <xs:element name="test-cases" minOccurs="1" maxOccurs="1">
                 <xs:complexType>
@@ -90,7 +96,7 @@
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
-        </xs:sequence>
+        </xs:all>
         <xs:attribute name="description" type="xs:string" use="optional"/>
         <xs:attribute name="timeout" type="xs:decimal" use="optional"/>
     </xs:complexType>
