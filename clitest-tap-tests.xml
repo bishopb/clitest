@@ -55,8 +55,8 @@
         <arg>suites/suite-normalize-invalid.xml</arg>
       </args>
       <expect>
-        <stdout match="regex">(?s)not ok 1 - Invalid normalization.*error_type: "ConfigurationError"</stdout>
-        <exit_code>1</exit_code>
+        <stderr match="contains">&lt;stdout&gt; has invalid 'normalize' keyword(s): ['foo']</stderr>
+        <exit_code>2</exit_code>
       </expect>
     </test-case>
 
@@ -107,7 +107,7 @@
         <arg>suites/suite-invalid.xml</arg>
       </args>
       <expect>
-        <stderr match="contains">Error: Invalid XML in suite file 'suites/suite-invalid.xml'</stderr>
+        <stderr match="regex">(?s)Error: Validation failed for suite 'suites/suite-invalid.xml':.*- XML is not well-formed: mismatched tag: line 8, column 2</stderr>
         <exit_code>2</exit_code>
       </expect>
     </test-case>
