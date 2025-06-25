@@ -440,7 +440,7 @@ def run_suite(suite_path, pre_parsed_tree, args) -> SuiteResult:
     suite_result.duration = time.time() - start_time
     return suite_result
 
-def list_tests(parsed_trees):
+def list_cases(parsed_trees):
     print("The following tests would be run:")
     for path, tree in parsed_trees.items():
         root = tree.getroot()
@@ -464,7 +464,7 @@ def main():
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output.')
     mode_group.add_argument('-q', '--quiet', action='store_true', help='Enable quiet output.')
-    mode_group.add_argument('--list-tests', action='store_true', help='List all tests that would be run without executing them.')
+    mode_group.add_argument('--list-cases', action='store_true', help='List all test cases that would be run without executing them.')
     
     parser.add_argument('--reporter', choices=['tap', 'junit', 'spec'], default='spec', help='The output format for test results (default: %(default)s).')
     
@@ -491,8 +491,8 @@ def main():
     if has_errors:
         return EXIT_CODE_RUNTIME_ERROR
 
-    if args.list_tests:
-        list_tests(parsed_trees)
+    if args.list_cases:
+        list_cases(parsed_trees)
         return EXIT_CODE_SUCCESS
 
     all_suite_results = [run_suite(path, tree, args) for path, tree in parsed_trees.items()]

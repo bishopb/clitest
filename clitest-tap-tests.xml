@@ -179,11 +179,11 @@
       </expect>
     </test-case>
 
-    <test-case description="Should list tests with --list-tests flag and not run them">
+    <test-case description="Should list tests with --list-cases flag and not run them">
       <command>python3</command>
       <args>
         <arg>clitest.py</arg>
-        <arg>--list-tests</arg>
+        <arg>--list-cases</arg>
         <arg>suites/suite-pass.xml</arg>
         <arg>suites/suite-fail.xml</arg>
       </args>

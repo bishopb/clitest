@@ -44,7 +44,7 @@ $ python3 clitest.py clitest-*-tests.xml
     ✓ Should produce valid TAP subtest output for multiple suites
     ✓ Should produce verbose output with --verbose flag
     ✓ Should show usage error for mutually exclusive flags --verbose and --quiet
-    ✓ Should list tests with --list-tests flag and not run them
+    ✓ Should list tests with --list-cases flag and not run them
 
   20 tests run, 20 passing, 0 failing
 ```
@@ -65,7 +65,7 @@ $ python3 clitest.py -h
 ## Usage
 
 ```
-usage: clitest.py [-h] [-v | -q | --list-tests] [--reporter {tap,junit,spec}] SUITE [SUITE ...]
+usage: clitest.py [-h] [-v | -q | --list-cases] [--reporter {tap,junit,spec}] SUITE [SUITE ...]
 
 A generic, language-agnostic command-line test runner.
 
@@ -76,15 +76,14 @@ options:
   -h, --help            show this help message and exit
   -v, --verbose         Enable verbose output.
   -q, --quiet           Enable quiet output.
-  --list-tests          List all tests that would be run without executing them.
+  --list-cases          List all test cases that would be run without executing them.
   --reporter {tap,junit,spec}
                         The output format for test results (default: spec).
 ```
 
 * `clitest.py` is invoked from the command line, specifying one or more test suite files.
-* By default, `clitest.py` will run the tests given in the test suite files.
-* To simply list the cases that would be run (rather than run them), pass the `--list-tests` option.
-* By default, `spec` output is shown. Use the `--reporter` option to choose `tap` or `junit` alternatives.
+* `clitest.py` runs the tests given by the test suite files arguments, unless the `--list-cases` option is given, in which case only the cases that would be run are displayed.
+* `clitest.py` shows the test results in `spec` output be default, but can be switched to `tap` or `junit` with the `--reporter` option.
 
 ## Test Suite XML Specification
 
